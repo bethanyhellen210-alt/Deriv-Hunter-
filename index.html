@@ -13,8 +13,10 @@
 <div class="flex items-center justify-between gap-3 flex-wrap">
 <div class="font-black text-lg">ELISY254 <span class="text-yellow-400">FOREX HUNTER</span><span class="ml-3 text-xs text-gray-400"><i id="dot" class="dot"></i> <span id="status">DISCONNECTED</span></span></div>
 <div class="flex gap-2 flex-wrap">
-<input id="pat" type="password" autocomplete="off" placeholder="PAT token" class="w-48 px-3 py-2 rounded-lg text-xs">
-<button class="btn gold" onclick="connectPAT()">CONNECT</button>
+<button class="btn gold" onclick="oauthStart(false)">SIGN IN</button>
+<button class="btn dark" onclick="oauthStart(true)">SIGN UP</button>
+<input id="pat" type="password" autocomplete="off" placeholder="PAT token" class="w-40 px-3 py-2 rounded-lg text-xs">
+<button class="btn dark" onclick="connectPAT()">PAT CONNECT</button>
 </div></div>
 <div class="flex gap-2 overflow-x-auto pt-3">
 <button class="navbtn active" onclick="page('dashboard',this)">DASHBOARD</button>
@@ -102,6 +104,76 @@ function start(){if(!connected){alert('Enter a PAT starting with PAT, then press
 function stop(){active=false;$('sniperStatus').textContent='STOPPED';$('engState').textContent='STOPPED';$('start').disabled=false;$('stop').disabled=true;log('ANALYSIS STOPPED')}
 function requestProposal(type){if(!ws||ws.readyState!==1)return;let amount=Math.max(.35,Number(stake)||1),duration=Math.max(1,parseInt($('duration').value)||1),barrier=String(Math.min(9,Math.max(0,parseInt($('barrier').value)||5)));let msg={proposal:1,amount:Number(amount.toFixed(2)),basis:'stake',contract_type:type,currency:'USD',duration,duration_unit:'t',symbol};if(['DIGITOVER','DIGITUNDER','DIGITMATCH','DIGITDIFF'].includes(type))msg.barrier=barrier;log('SIGNAL CONFIRMED • PROPOSAL REQUESTED • '+type+' • DIGIT '+barrier);ws.send(JSON.stringify(msg))}
 function onMessage(d){if(d.error){log('ERROR: '+(d.error.message||'Deriv error'));return}if(d.msg_type==='tick'&&d.tick)handleTick(Number(d.tick.quote));if(d.msg_type==='balance'&&d.balance)$('balance').textContent='$'+Number(d.balance.balance||0).toFixed(2);if(d.msg_type==='proposal'&&d.proposal&&auto&&active)ws.send(JSON.stringify({buy:d.proposal.id,price:Number(d.proposal.ask_price)}));if(d.msg_type==='buy'&&d.buy){trades++;$('trades').textContent=trades;log('TRADE OPENED • CONTRACT '+d.buy.contract_id);ws.send(JSON.stringify({proposal_open_contract:1,contract_id:d.buy.contract_id,subscribe:1}))}if(d.msg_type==='proposal_open_contract'&&d.proposal_open_contract?.is_sold){let profit=Number(d.proposal_open_contract.profit||0);if(profit<0){losses++;let max=Number($('maxSteps').value)||0;if(losses<=max){stake*=Number($('mult').value)||2;log('LOSS • MARTINGALE STEP '+losses+' • NEXT $'+stake.toFixed(2))}else{log('LOSS LIMIT REACHED');stop()}}else{losses=0;stake=Math.max(.35,Number($('stake').value)||1);log('WIN • STAKE RESET')}$('nextStake').textContent='$'+stake.toFixed(2)}}
+async function oauthStart(signup=false){
+  try{
+    if(!APP_ID)throw Error('Deriv OAuth App ID is not configured. Add DERIV_APP_ID in Vercel.');
+    const bytes=crypto.getRandomValues(new Uint8Array(64));
+    const verifier=Array.from(bytes).map(v=>'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'[v%66]).join('');
+    const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));
+    const challenge=btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    const state=Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('');
+    sessionStorage.setItem('oauth_code_verifier',verifier);
+    sessionStorage.setItem('oauth_state',state);
+    sessionStorage.setItem('oauth_mode',mode);
+    const redirect=window.location.origin+'/';
+    const u=new URL('https://auth.deriv.com/oauth2/auth');
+    u.searchParams.set('response_type','code');
+    u.searchParams.set('client_id',APP_ID);
+    u.searchParams.set('redirect_uri',redirect);
+    u.searchParams.set('scope','trade account_manage');
+    u.searchParams.set('state',state);
+    u.searchParams.set('code_challenge',challenge);
+    u.searchParams.set('code_challenge_method','S256');
+    if(signup)u.searchParams.set('prompt','registration');
+    window.location.href=u.toString();
+  }catch(e){alert('Deriv sign-in failed: '+e.message);log('OAUTH ERROR • '+e.message)}
+}
+async function handleOAuthCallback(){
+  const p=new URLSearchParams(window.location.search),code=p.get('code'),state=p.get('state'),error=p.get('error');
+  if(error){alert('Deriv sign-in was cancelled or failed: '+(p.get('error_description')||error));history.replaceState({},'',window.location.pathname);return}
+  if(!code)return;
+  const saved=sessionStorage.getItem('oauth_state'),verifier=sessionStorage.getItem('oauth_code_verifier');
+  if(!saved||!verifier||state!==saved){alert('OAuth security check failed. Please sign in again.');return}
+  try{
+    $('status').textContent='SIGNING IN';
+    const redirect=window.location.origin+'/';
+    const r=await fetch('/api/oauth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,code_verifier:verifier,redirect_uri:redirect,client_id:APP_ID})});
+    const b=await r.json();
+    if(!r.ok||!b.access_token)throw Error(b?.error_description||b?.error||'OAuth token exchange failed');
+    sessionStorage.removeItem('oauth_state');sessionStorage.removeItem('oauth_code_verifier');
+    sessionStorage.setItem('oauth_access_token',b.access_token);
+    if(sessionStorage.getItem('oauth_mode'))mode=sessionStorage.getItem('oauth_mode');
+    history.replaceState({},'',window.location.pathname);
+    await connectOAuth(b.access_token);
+  }catch(e){alert('Sign-in failed: '+e.message);log('OAUTH ERROR • '+e.message)}
+}
+async function connectOAuth(token){
+  try{
+    const h={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
+    const r=await fetch('/api/deriv/accounts',{headers:h});
+    const b=await r.json();
+    if(!r.ok)throw Error(b?.errors?.[0]?.message||b?.error||'Could not load Deriv account');
+    const accounts=Array.isArray(b.data)?b.data:(b.data?[b.data]:[]);
+    if(!accounts.length)throw Error('No Deriv trading account found');
+    const wanted=accounts.find(a=>String(a.account_type||'').toLowerCase()===mode)||accounts[0];
+    const ar=await fetch('/api/deriv/otp',{method:'POST',headers:h,body:JSON.stringify({account_id:wanted.account_id})});
+    const ab=await ar.json();
+    if(!ar.ok)throw Error(ab?.errors?.[0]?.message||ab?.error||'Could not create WebSocket session');
+    const url=ab?.data?.url||ab?.data?.websocket_url||ab?.data?.ws_url;
+    if(!url)throw Error('Deriv did not return a WebSocket URL');
+    if(ws)try{ws.close()}catch(e){}
+    ws=new WebSocket(url);
+    ws.onopen=()=>{setConnected(true);$('account').textContent=wanted.account_id||'CONNECTED';$('balance').textContent='let token=$('pat').value.trim();if(!/^PAT/i.test(token)){alert('Invalid PAT. Enter a Deriv Personal Access Token that starts with PAT.');return}try{setConnected(false);$('status').textContent='CONNECTING';if(!APP_ID)throw Error('Deriv App ID is not configured on Vercel. Add DERIV_APP_ID and redeploy.');let h={'Authorization':'Bearer '+token,'Content-Type':'application/json'};let r=await fetch('/api/deriv/accounts',{headers:h});let b=await r.json();if(!r.ok)throw Error(b?.errors?.[0]?.message||b?.error||'PAT authentication failed');let accounts=Array.isArray(b.data)?b.data:(b.data?[b.data]:[]);if(!accounts.length)throw Error('No Deriv trading account found');let wanted=accounts.find(a=>String(a.account_type||'').toLowerCase()===mode)||accounts[0];let ar=await fetch('/api/deriv/otp',{method:'POST',headers:h,body:JSON.stringify({account_id:wanted.account_id})});let ab=await ar.json();if(!ar.ok)throw Error(ab?.errors?.[0]?.message||ab?.error||'Could not create WebSocket session');let url=ab?.data?.url||ab?.data?.websocket_url||ab?.data?.ws_url;if(!url)throw Error('Deriv did not return a WebSocket URL');if(ws)try{ws.close()}catch(e){}ws=new WebSocket(url);ws.onopen=()=>{setConnected(true);$('account').textContent=wanted.account_id||'CONNECTED';$('balance').textContent='$'+Number(wanted.balance||0).toFixed(2);log('PAT CONNECTED • '+wanted.account_id);subscribe()};ws.onmessage=e=>{try{onMessage(JSON.parse(e.data))}catch(err){log('MESSAGE ERROR')}};ws.onerror=()=>{setConnected(false);log('WEBSOCKET ERROR')};ws.onclose=()=>setConnected(false)}catch(e){setConnected(false);$('status').textContent='DISCONNECTED';alert('PAT connection failed: '+e.message);log('PAT ERROR • '+e.message)}}
+function calculate(){let b=Number($('base').value)||0,m=Number($('cmult').value)||0,n=Math.max(0,Number($('steps').value)||0),t=0,x=b;for(let i=0;i<n;i++){t+=x;x*=m}$('total').textContent='$'+t.toFixed(2)}
+async function loadConfig(){try{let r=await fetch('/api/config',{cache:'no-store'});if(!r.ok)throw Error('Config endpoint unavailable');let x=await r.json();if(x.derivAppId)APP_ID=String(x.derivAppId)}catch(e){APP_ID='';log('CONFIG ERROR • Add DERIV_APP_ID in Vercel')} }
+loadConfig().then(()=>handleOAuthCallback());calculate();setMode('demo');
+</script>
+</body></html>+Number(wanted.balance||0).toFixed(2);log('DERIV SIGN-IN CONNECTED • '+wanted.account_id);subscribe()};
+    ws.onmessage=e=>{try{onMessage(JSON.parse(e.data))}catch(err){log('MESSAGE ERROR')}};
+    ws.onerror=()=>{setConnected(false);log('WEBSOCKET ERROR')};
+    ws.onclose=()=>setConnected(false);
+  }catch(e){setConnected(false);$('status').textContent='DISCONNECTED';sessionStorage.removeItem('oauth_access_token');alert('Deriv connection failed: '+e.message);log('OAUTH ERROR • '+e.message)}
+}
 async function connectPAT(){let token=$('pat').value.trim();if(!/^PAT/i.test(token)){alert('Invalid PAT. Enter a Deriv Personal Access Token that starts with PAT.');return}try{setConnected(false);$('status').textContent='CONNECTING';if(!APP_ID)throw Error('Deriv App ID is not configured on Vercel. Add DERIV_APP_ID and redeploy.');let h={'Authorization':'Bearer '+token,'Content-Type':'application/json'};let r=await fetch('/api/deriv/accounts',{headers:h});let b=await r.json();if(!r.ok)throw Error(b?.errors?.[0]?.message||b?.error||'PAT authentication failed');let accounts=Array.isArray(b.data)?b.data:(b.data?[b.data]:[]);if(!accounts.length)throw Error('No Deriv trading account found');let wanted=accounts.find(a=>String(a.account_type||'').toLowerCase()===mode)||accounts[0];let ar=await fetch('/api/deriv/otp',{method:'POST',headers:h,body:JSON.stringify({account_id:wanted.account_id})});let ab=await ar.json();if(!ar.ok)throw Error(ab?.errors?.[0]?.message||ab?.error||'Could not create WebSocket session');let url=ab?.data?.url||ab?.data?.websocket_url||ab?.data?.ws_url;if(!url)throw Error('Deriv did not return a WebSocket URL');if(ws)try{ws.close()}catch(e){}ws=new WebSocket(url);ws.onopen=()=>{setConnected(true);$('account').textContent=wanted.account_id||'CONNECTED';$('balance').textContent='$'+Number(wanted.balance||0).toFixed(2);log('PAT CONNECTED • '+wanted.account_id);subscribe()};ws.onmessage=e=>{try{onMessage(JSON.parse(e.data))}catch(err){log('MESSAGE ERROR')}};ws.onerror=()=>{setConnected(false);log('WEBSOCKET ERROR')};ws.onclose=()=>setConnected(false)}catch(e){setConnected(false);$('status').textContent='DISCONNECTED';alert('PAT connection failed: '+e.message);log('PAT ERROR • '+e.message)}}
 function calculate(){let b=Number($('base').value)||0,m=Number($('cmult').value)||0,n=Math.max(0,Number($('steps').value)||0),t=0,x=b;for(let i=0;i<n;i++){t+=x;x*=m}$('total').textContent='$'+t.toFixed(2)}
 async function loadConfig(){try{let r=await fetch('/api/config',{cache:'no-store'});if(!r.ok)throw Error('Config endpoint unavailable');let x=await r.json();if(x.derivAppId)APP_ID=String(x.derivAppId)}catch(e){APP_ID='';log('CONFIG ERROR • Add DERIV_APP_ID in Vercel')} }
