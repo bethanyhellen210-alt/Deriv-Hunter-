@@ -213,6 +213,18 @@ async function loadConfig(){
     log('CONFIG ERROR • Add DERIV_APP_ID in Vercel');
   }
 }
+
+/* Reliable mobile tap handling */
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('button').forEach(btn=>{
+    btn.type='button';
+    btn.addEventListener('touchend',e=>{
+      e.preventDefault();
+      btn.click();
+    },{passive:false});
+  });
+});
+
 loadConfig().then(()=>handleOAuthCallback());
 calculate();
 setMode('demo');
