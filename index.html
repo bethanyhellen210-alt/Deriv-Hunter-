@@ -168,7 +168,7 @@
 </main>
 
 <script>
-const APP_ID=window.ELISY_DERIV_APP_ID||1089;
+let APP_ID=window.ELISY_DERIV_APP_ID||1089;
 let patToken='';
 
 let ws=null, connected=false, sniperActive=false, autoTrade=false, currentSymbol='frxEURUSD';
@@ -271,6 +271,13 @@ function handleContract(c){
  if(c.is_sold){const profit=Number(c.profit||0);if(profit<0){lossStep++;const mult=Number(document.getElementById('martingale').value)||2;const max=Number(document.getElementById('maxSteps').value)||0;if(lossStep<=max){currentStake*=mult;logTrade('LOSS • MARTINGALE STEP '+lossStep+' • NEXT $'+currentStake.toFixed(2))}else{logTrade('LOSS LIMIT REACHED • ANALYSIS STOPPED');stopSniper()}}else{lossStep=0;currentStake=Math.max(.35,Number(document.getElementById('stake').value)||1);logTrade('WIN • STAKE RESET TO $'+currentStake.toFixed(2))}document.getElementById('nextStake').textContent='$'+currentStake.toFixed(2)}}
 function calc(){const b=Number(document.getElementById('calcBase').value)||0,m=Number(document.getElementById('calcMult').value)||0,s=Math.max(0,Number(document.getElementById('calcSteps').value)||0);let t=0,x=b;for(let i=0;i<s;i++){t+=x;x*=m}document.getElementById('calcTotal').textContent='$'+t.toFixed(2)}
 document.getElementById('stake').addEventListener('input',e=>{document.getElementById('stakeLabel').textContent='$'+Number(e.target.value||0).toFixed(2)});
+async function loadConfig(){
+ try{
+  const r=await fetch('/api/config',{cache:'no-store'});
+  if(r.ok){const x=await r.json();if(x.derivAppId)APP_ID=String(x.derivAppId)}
+ }catch(e){console.warn('Vercel config unavailable; using fallback App ID')}
+}
+loadConfig();
 calc();setAccountMode('demo');
 </script>
 </body>
