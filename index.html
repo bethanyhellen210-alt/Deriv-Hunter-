@@ -32,8 +32,10 @@
         </div>
       </div>
       <div class="flex items-center gap-2">
-        <input id="token" type="password" placeholder="Deriv API token" class="w-48 px-3 py-2 rounded-lg text-xs">
+        <input id="token" type="password" placeholder="Legacy API token" class="w-40 px-3 py-2 rounded-lg text-xs">
         <button id="connectBtn" onclick="connect()" class="btn btn-gold">CONNECT</button>
+        <input id="patToken" type="password" placeholder="Personal Access Token (PAT)" class="w-52 px-3 py-2 rounded-lg text-xs">
+        <button id="patBtn" onclick="connectPAT()" class="btn btn-dark">LOGIN PAT</button>
       </div>
     </div>
     <div class="flex gap-2 overflow-x-auto pt-3">
@@ -166,7 +168,9 @@
 </main>
 
 <script>
-const APP_ID=1089;
+const APP_ID=window.ELISY_DERIV_APP_ID||1089;
+let patToken='';
+
 let ws=null, connected=false, sniperActive=false, autoTrade=false, currentSymbol='frxEURUSD';
 let ticks=[], currentStake=1, lossStep=0, tradeCount=0, lastTradeTime=0;
 const names={frxEURUSD:'EUR/USD',frxGBPUSD:'GBP/USD',frxUSDJPY:'USD/JPY',frxAUDUSD:'AUD/USD',frxUSDCAD:'USD/CAD',frxUSDCHF:'USD/CHF',frxXAUUSD:'XAU/USD'};
@@ -182,6 +186,175 @@ function setAccountMode(mode){
 }
 function logTrade(m){const box=document.getElementById('tradeLog');if(box.children.length===1&&box.firstElementChild.textContent.includes('No transaction'))box.innerHTML='';const d=document.createElement('div');d.textContent='['+new Date().toLocaleTimeString()+'] '+m;box.prepend(d)}
 function setConnected(v){connected=v;document.getElementById('wsDot').className='status-dot '+(v?'on':'');document.getElementById('wsText').textContent=v?'CONNECTED':'DISCONNECTED';document.getElementById('streamState').textContent=v?'LIVE':'OFFLINE'}
+async function connectPAT(){
+ const token=document.getElementById('patToken').value.trim();
+ if(!token){alert('Enter your Deriv Personal Access Token (PAT).');return}
+ patToken=token;
+ try{
+  document.getElementById('wsText').textContent='AUTHENTICATING PAT';
+  const headers={'Authorization':'Bearer '+token,'Deriv-App-ID':String(APP_ID),'Content-Type':'application/json'};
+  const r=await fetch('https://api.derivws.com/trading/v1/options/accounts',{headers});
+  const body=await r.json();
+  if(!r.ok) throw new Error(body?.errors?.[0]?.message||'PAT authentication failed');
+  const accounts=Array.isArray(body.data)?body.data:(body.data?[body.data]:[]);
+  if(!accounts.length) throw new Error('No Options trading account was returned for this PAT.');
+  const wanted=document.getElementById('realBtn').classList.contains('btn-gold')?'real':'demo';
+  const account=accounts.find(a=>a.account_type===wanted)||accounts[0];
+  const otp=await fetch('https://api.derivws.com/trading/v1/options/accounts/'+encodeURIComponent(account.account_id)+'/otp',{method:'POST',headers});
+  const otpBody=await otp.json();
+  if(!otp.ok) throw new Error(otpBody?.errors?.[0]?.message||'Could not create WebSocket session');
+  const wsUrl=otpBody?.data?.websocket_url||otpBody?.data?.ws_url;
+  if(!wsUrl) throw new Error('Deriv did not return a WebSocket URL');
+  if(ws)try{ws.close()}catch(e){}
+  ws=new WebSocket(wsUrl);
+  ws.onopen=()=>{setConnected(true);document.getElementById('dashAccount').textContent=account.account_id||'CONNECTED';document.getElementById('dashBalance').textContent='
+ const token=document.getElementById('token').value.trim(); if(!token){alert('Enter your Deriv API token.');return}
+ if(ws)try{ws.close()}catch(e){}
+ ws=new WebSocket('wss://ws.derivws.com/websockets/v3?app_id='+APP_ID);
+ ws.onopen=()=>ws.send(JSON.stringify({authorize:token}));
+ ws.onmessage=e=>{
+  const d=JSON.parse(e.data);
+  if(d.error){logTrade('ERROR: '+d.error.message);return}
+  if(d.msg_type==='authorize'){setConnected(true);const a=d.authorize;document.getElementById('dashAccount').textContent=a.loginid||'CONNECTED';document.getElementById('dashBalance').textContent='$'+Number(a.balance||0).toFixed(2);ws.send(JSON.stringify({balance:1,subscribe:1}));subscribeTicks()}
+  if(d.msg_type==='balance'&&d.balance)document.getElementById('dashBalance').textContent='$'+Number(d.balance.balance||0).toFixed(2);
+  if(d.msg_type==='tick'&&d.tick)handleTick(Number(d.tick.quote));
+  if(d.msg_type==='proposal'&&d.proposal)handleProposal(d.proposal);
+  if(d.msg_type==='buy'&&d.buy){tradeCount++;document.getElementById('tradeCount').textContent=tradeCount;logTrade('TRADE OPENED • CONTRACT '+d.buy.contract_id);ws.send(JSON.stringify({proposal_open_contract:1,contract_id:d.buy.contract_id,subscribe:1}))}
+  if(d.msg_type==='proposal_open_contract'&&d.proposal_open_contract)handleContract(d.proposal_open_contract);
+ };
+ ws.onclose=()=>setConnected(false); ws.onerror=()=>setConnected(false);
+}
+function subscribeTicks(){
+ if(!ws||ws.readyState!==1)return;
+ ws.send(JSON.stringify({forget_all:'ticks'})); ws.send(JSON.stringify({ticks:currentSymbol,subscribe:1}));
+}
+function changeMarket(s){
+ currentSymbol=s; document.getElementById('sniperMarket').value=s;document.getElementById('signalMarket').value=s;
+ document.getElementById('sniperMarketLabel').textContent=names[s];document.getElementById('dashMarket').textContent=names[s];document.getElementById('engineMarket').textContent=names[s];
+ ticks=[]; if(connected)subscribeTicks();
+}
+function handleTick(price){
+ document.getElementById('dashPrice').textContent=price;document.getElementById('signalPrice').textContent=price;document.getElementById('enginePrice').textContent=price;
+ ticks.push(price);if(ticks.length>20)ticks.shift();
+ if(ticks.length>=5){const up=ticks[ticks.length-1]>ticks[ticks.length-5];const dir=up?'CALL':'PUT';const conf=Math.min(95,55+Math.round(Math.abs(ticks[ticks.length-1]-ticks[0])/(Math.abs(ticks[0])||1)*100000));
+ document.getElementById('trend').textContent=up?'BULLISH':'BEARISH';document.getElementById('entry').textContent=dir;document.getElementById('confidence').textContent=conf+'%';document.getElementById('signalDirection').textContent=dir;document.getElementById('engineSignal').textContent=dir;
+ if(sniperActive)runSniper(dir,price);
+ }
+}
+function toggleAutoTrade(){autoTrade=!autoTrade;const b=document.getElementById('autoTrade');b.textContent=autoTrade?'ON':'OFF';b.className='btn '+(autoTrade?'btn-gold':'btn-dark');}
+function startSniper(){
+ if(!connected){alert('Connect the Deriv account first.');return}
+ sniperActive=true;currentStake=Math.max(.35,Number(document.getElementById('stake').value)||1);lossStep=0;
+ document.getElementById('sniperStatus').textContent='ANALYZING';document.getElementById('engineState').textContent='RUNNING';document.getElementById('startAnalysis').disabled=true;document.getElementById('stopAnalysis').disabled=false;
+ logTrade('ANALYSIS STARTED • '+names[currentSymbol]+' • '+document.getElementById('contractType').value+' • $'+currentStake.toFixed(2)+(autoTrade?' • AUTO TRADE ON':' • SIGNAL ONLY'));
+}
+function stopSniper(){sniperActive=false;document.getElementById('sniperStatus').textContent='STOPPED';document.getElementById('engineState').textContent='STOPPED';document.getElementById('startAnalysis').disabled=false;document.getElementById('stopAnalysis').disabled=true;logTrade('ANALYSIS STOPPED')}
+function runSniper(signal,price){
+ const chosen=document.getElementById('contractType').value;
+ if(signal!==chosen)return;
+ document.getElementById('nextStake').textContent='$'+currentStake.toFixed(2);
+ if(!autoTrade)return;
+ const now=Date.now();if(now-lastTradeTime<8000)return;
+ lastTradeTime=now; requestProposal(chosen);
+}
+function requestProposal(type){
+ if(!ws||ws.readyState!==1)return;
+ const duration=Math.max(1,parseInt(document.getElementById('duration').value)||1);
+ logTrade('SIGNAL CONFIRMED • REQUESTING DERIV PROPOSAL • '+type+' • $'+currentStake.toFixed(2));
+ ws.send(JSON.stringify({proposal:1,amount:Number(currentStake.toFixed(2)),basis:'stake',contract_type:type,currency:'USD',duration,duration_unit:'t',symbol:currentSymbol}));
+}
+function handleProposal(p){
+ if(!autoTrade||!sniperActive||!p.id)return;
+ ws.send(JSON.stringify({buy:p.id,price:Number(p.ask_price)}));
+}
+function handleContract(c){
+ if(c.is_sold){const profit=Number(c.profit||0);if(profit<0){lossStep++;const mult=Number(document.getElementById('martingale').value)||2;const max=Number(document.getElementById('maxSteps').value)||0;if(lossStep<=max){currentStake*=mult;logTrade('LOSS • MARTINGALE STEP '+lossStep+' • NEXT $'+currentStake.toFixed(2))}else{logTrade('LOSS LIMIT REACHED • ANALYSIS STOPPED');stopSniper()}}else{lossStep=0;currentStake=Math.max(.35,Number(document.getElementById('stake').value)||1);logTrade('WIN • STAKE RESET TO $'+currentStake.toFixed(2))}document.getElementById('nextStake').textContent='$'+currentStake.toFixed(2)}}
+function calc(){const b=Number(document.getElementById('calcBase').value)||0,m=Number(document.getElementById('calcMult').value)||0,s=Math.max(0,Number(document.getElementById('calcSteps').value)||0);let t=0,x=b;for(let i=0;i<s;i++){t+=x;x*=m}document.getElementById('calcTotal').textContent='$'+t.toFixed(2)}
+document.getElementById('stake').addEventListener('input',e=>{document.getElementById('stakeLabel').textContent='$'+Number(e.target.value||0).toFixed(2)});
+calc();setAccountMode('demo');
+</script>
+</body>
+</html>+Number(account.balance||0).toFixed(2);subscribeTicks();logTrade('PAT LOGIN SUCCESS • '+account.account_id+' • '+account.account_type.toUpperCase())};
+  ws.onmessage=e=>handlePATMessage(JSON.parse(e.data));
+  ws.onclose=()=>setConnected(false);
+  ws.onerror=()=>{setConnected(false);logTrade('PAT WebSocket connection error')};
+ }catch(err){setConnected(false);alert('PAT login failed: '+err.message);logTrade('PAT ERROR: '+err.message)}
+}
+function handlePATMessage(d){
+ if(d.error){logTrade('ERROR: '+d.error.message);return}
+ if(d.msg_type==='tick'&&d.tick)handleTick(Number(d.tick.quote));
+ if(d.msg_type==='proposal'&&d.proposal)handleProposal(d.proposal);
+ if(d.msg_type==='buy'&&d.buy){tradeCount++;document.getElementById('tradeCount').textContent=tradeCount;logTrade('TRADE OPENED • CONTRACT '+d.buy.contract_id);ws.send(JSON.stringify({proposal_open_contract:1,contract_id:d.buy.contract_id,subscribe:1}))}
+ if(d.msg_type==='proposal_open_contract'&&d.proposal_open_contract)handleContract(d.proposal_open_contract);
+ if(d.msg_type==='balance'&&d.balance)document.getElementById('dashBalance').textContent='
+ const token=document.getElementById('token').value.trim(); if(!token){alert('Enter your Deriv API token.');return}
+ if(ws)try{ws.close()}catch(e){}
+ ws=new WebSocket('wss://ws.derivws.com/websockets/v3?app_id='+APP_ID);
+ ws.onopen=()=>ws.send(JSON.stringify({authorize:token}));
+ ws.onmessage=e=>{
+  const d=JSON.parse(e.data);
+  if(d.error){logTrade('ERROR: '+d.error.message);return}
+  if(d.msg_type==='authorize'){setConnected(true);const a=d.authorize;document.getElementById('dashAccount').textContent=a.loginid||'CONNECTED';document.getElementById('dashBalance').textContent='$'+Number(a.balance||0).toFixed(2);ws.send(JSON.stringify({balance:1,subscribe:1}));subscribeTicks()}
+  if(d.msg_type==='balance'&&d.balance)document.getElementById('dashBalance').textContent='$'+Number(d.balance.balance||0).toFixed(2);
+  if(d.msg_type==='tick'&&d.tick)handleTick(Number(d.tick.quote));
+  if(d.msg_type==='proposal'&&d.proposal)handleProposal(d.proposal);
+  if(d.msg_type==='buy'&&d.buy){tradeCount++;document.getElementById('tradeCount').textContent=tradeCount;logTrade('TRADE OPENED • CONTRACT '+d.buy.contract_id);ws.send(JSON.stringify({proposal_open_contract:1,contract_id:d.buy.contract_id,subscribe:1}))}
+  if(d.msg_type==='proposal_open_contract'&&d.proposal_open_contract)handleContract(d.proposal_open_contract);
+ };
+ ws.onclose=()=>setConnected(false); ws.onerror=()=>setConnected(false);
+}
+function subscribeTicks(){
+ if(!ws||ws.readyState!==1)return;
+ ws.send(JSON.stringify({forget_all:'ticks'})); ws.send(JSON.stringify({ticks:currentSymbol,subscribe:1}));
+}
+function changeMarket(s){
+ currentSymbol=s; document.getElementById('sniperMarket').value=s;document.getElementById('signalMarket').value=s;
+ document.getElementById('sniperMarketLabel').textContent=names[s];document.getElementById('dashMarket').textContent=names[s];document.getElementById('engineMarket').textContent=names[s];
+ ticks=[]; if(connected)subscribeTicks();
+}
+function handleTick(price){
+ document.getElementById('dashPrice').textContent=price;document.getElementById('signalPrice').textContent=price;document.getElementById('enginePrice').textContent=price;
+ ticks.push(price);if(ticks.length>20)ticks.shift();
+ if(ticks.length>=5){const up=ticks[ticks.length-1]>ticks[ticks.length-5];const dir=up?'CALL':'PUT';const conf=Math.min(95,55+Math.round(Math.abs(ticks[ticks.length-1]-ticks[0])/(Math.abs(ticks[0])||1)*100000));
+ document.getElementById('trend').textContent=up?'BULLISH':'BEARISH';document.getElementById('entry').textContent=dir;document.getElementById('confidence').textContent=conf+'%';document.getElementById('signalDirection').textContent=dir;document.getElementById('engineSignal').textContent=dir;
+ if(sniperActive)runSniper(dir,price);
+ }
+}
+function toggleAutoTrade(){autoTrade=!autoTrade;const b=document.getElementById('autoTrade');b.textContent=autoTrade?'ON':'OFF';b.className='btn '+(autoTrade?'btn-gold':'btn-dark');}
+function startSniper(){
+ if(!connected){alert('Connect the Deriv account first.');return}
+ sniperActive=true;currentStake=Math.max(.35,Number(document.getElementById('stake').value)||1);lossStep=0;
+ document.getElementById('sniperStatus').textContent='ANALYZING';document.getElementById('engineState').textContent='RUNNING';document.getElementById('startAnalysis').disabled=true;document.getElementById('stopAnalysis').disabled=false;
+ logTrade('ANALYSIS STARTED • '+names[currentSymbol]+' • '+document.getElementById('contractType').value+' • $'+currentStake.toFixed(2)+(autoTrade?' • AUTO TRADE ON':' • SIGNAL ONLY'));
+}
+function stopSniper(){sniperActive=false;document.getElementById('sniperStatus').textContent='STOPPED';document.getElementById('engineState').textContent='STOPPED';document.getElementById('startAnalysis').disabled=false;document.getElementById('stopAnalysis').disabled=true;logTrade('ANALYSIS STOPPED')}
+function runSniper(signal,price){
+ const chosen=document.getElementById('contractType').value;
+ if(signal!==chosen)return;
+ document.getElementById('nextStake').textContent='$'+currentStake.toFixed(2);
+ if(!autoTrade)return;
+ const now=Date.now();if(now-lastTradeTime<8000)return;
+ lastTradeTime=now; requestProposal(chosen);
+}
+function requestProposal(type){
+ if(!ws||ws.readyState!==1)return;
+ const duration=Math.max(1,parseInt(document.getElementById('duration').value)||1);
+ logTrade('SIGNAL CONFIRMED • REQUESTING DERIV PROPOSAL • '+type+' • $'+currentStake.toFixed(2));
+ ws.send(JSON.stringify({proposal:1,amount:Number(currentStake.toFixed(2)),basis:'stake',contract_type:type,currency:'USD',duration,duration_unit:'t',symbol:currentSymbol}));
+}
+function handleProposal(p){
+ if(!autoTrade||!sniperActive||!p.id)return;
+ ws.send(JSON.stringify({buy:p.id,price:Number(p.ask_price)}));
+}
+function handleContract(c){
+ if(c.is_sold){const profit=Number(c.profit||0);if(profit<0){lossStep++;const mult=Number(document.getElementById('martingale').value)||2;const max=Number(document.getElementById('maxSteps').value)||0;if(lossStep<=max){currentStake*=mult;logTrade('LOSS • MARTINGALE STEP '+lossStep+' • NEXT $'+currentStake.toFixed(2))}else{logTrade('LOSS LIMIT REACHED • ANALYSIS STOPPED');stopSniper()}}else{lossStep=0;currentStake=Math.max(.35,Number(document.getElementById('stake').value)||1);logTrade('WIN • STAKE RESET TO $'+currentStake.toFixed(2))}document.getElementById('nextStake').textContent='$'+currentStake.toFixed(2)}}
+function calc(){const b=Number(document.getElementById('calcBase').value)||0,m=Number(document.getElementById('calcMult').value)||0,s=Math.max(0,Number(document.getElementById('calcSteps').value)||0);let t=0,x=b;for(let i=0;i<s;i++){t+=x;x*=m}document.getElementById('calcTotal').textContent='$'+t.toFixed(2)}
+document.getElementById('stake').addEventListener('input',e=>{document.getElementById('stakeLabel').textContent='$'+Number(e.target.value||0).toFixed(2)});
+calc();setAccountMode('demo');
+</script>
+</body>
+</html>+Number(d.balance.balance||0).toFixed(2);
+}
 function connect(){
  const token=document.getElementById('token').value.trim(); if(!token){alert('Enter your Deriv API token.');return}
  if(ws)try{ws.close()}catch(e){}
