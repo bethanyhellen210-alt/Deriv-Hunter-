@@ -88,7 +88,7 @@
 
 <script>
 let APP_ID='',ws=null,connected=false,active=false,auto=false,mode='demo',symbol='R_10',prices=[],stake=1,losses=0,trades=0,lastTrade=0;
-const names={R_10:'Volatility 10',R_25:'Volatility 25',R_50:'Volatility 50',R_75:'Volatility 75',R_100:'Volatility 100',1HZ10V:'Volatility 10 (1s)',1HZ25V:'Volatility 25 (1s)',1HZ50V:'Volatility 50 (1s)',1HZ75V:'Volatility 75 (1s)',1HZ100V:'Volatility 100 (1s)'};
+const names={R_10:'Volatility 10',R_25:'Volatility 25',R_50:'Volatility 50',R_75:'Volatility 75',R_100:'Volatility 100','1HZ10V':'Volatility 10 (1s)','1HZ25V':'Volatility 25 (1s)','1HZ50V':'Volatility 50 (1s)','1HZ75V':'Volatility 75 (1s)','1HZ100V':'Volatility 100 (1s)'};
 const $=id=>document.getElementById(id);
 function page(id,btn){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));$(id).classList.add('active');if(btn){document.querySelectorAll('.navbtn').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}}
 function setMode(m){mode=m;$('demo').className='btn '+(m==='demo'?'gold':'dark');$('real').className='btn '+(m==='real'?'gold':'dark');if(connected)log('ACCOUNT MODE: '+m.toUpperCase())}
@@ -213,17 +213,6 @@ async function loadConfig(){
     log('CONFIG ERROR • Add DERIV_APP_ID in Vercel');
   }
 }
-
-/* Reliable mobile tap handling */
-document.addEventListener('DOMContentLoaded',()=>{
-  document.querySelectorAll('button').forEach(btn=>{
-    btn.type='button';
-    btn.addEventListener('touchend',e=>{
-      e.preventDefault();
-      btn.click();
-    },{passive:false});
-  });
-});
 
 loadConfig().then(()=>handleOAuthCallback());
 calculate();
