@@ -1,550 +1,252 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Deriv Trading Dashboard & Bot Suite</title>
-    <!-- Tailwind CSS for styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ELISY254 Forex Hunter</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  *{box-sizing:border-box} body{margin:0;background:#070707;color:#f5f5f5;font-family:Inter,system-ui,sans-serif}
+  .panel{background:#101010;border:1px solid #242424;border-radius:16px}
+  .nav{background:#0b0b0b;border-bottom:1px solid #252525}
+  .navbtn{white-space:nowrap;padding:11px 16px;border-radius:10px;color:#9ca3af;font-size:13px;font-weight:700}
+  .navbtn.active{background:#f0b90b;color:#080808}
+  input,select{background:#080808!important;border:1px solid #303030!important;color:#fff!important}
+  .status-dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:#ef4444}
+  .status-dot.on{background:#22c55e}
+  .page{display:none}.page.active{display:block}
+  .btn{border-radius:10px;padding:11px 16px;font-weight:800;font-size:13px}
+  .btn-gold{background:#f0b90b;color:#080808}.btn-dark{background:#191919;border:1px solid #303030}
+  .metric{background:#0b0b0b;border:1px solid #222;border-radius:14px;padding:18px}
+  .log{font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px}
+</style>
 </head>
-<body class="h-screen flex flex-col">
-
-    <!-- TOP BAR / HEADER -->
-    <header class="glass px-6 py-4 flex flex-wrap justify-between items-center border-b border-slate-800 z-10">
-        <div class="flex items-center space-x-6">
-            <div class="flex items-center space-x-2">
-                <i class="fa-solid me-2 fa-chart-line text-red-500 text-2xl"></i>
-                <span class="font-bold text-xl tracking-wide text-white">DERIV <span class="text-red-500">PRO</span></span>
-            </div>
-            
-            <!-- REAL / DEMO BALANCE DISPLAY -->
-            <div id="account-badge" class="hidden items-center bg-slate-800/80 px-4 py-1.5 rounded-full border border-slate-700">
-                <span id="account-type" class="text-xs uppercase px-2 py-0.5 rounded font-bold mr-3 bg-gray-600 text-white">---</span>
-                <span id="account-id" class="text-xs text-slate-400 mr-3"></span>
-                <span class="text-slate-400 text-sm mr-1">$</span>
-                <span id="account-balance" class="font-mono font-bold text-lg text-emerald-400">0.00</span>
-            </div>
+<body>
+<header class="nav sticky top-0 z-50">
+  <div class="max-w-7xl mx-auto px-4 py-3">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="font-black tracking-wide text-lg">ELISY254 <span class="text-yellow-400">FOREX HUNTER</span></div>
+        <div class="flex items-center gap-2 text-xs text-gray-400">
+          <span id="wsDot" class="status-dot"></span><span id="wsText">DISCONNECTED</span>
         </div>
-
-        <!-- API TOKEN INPUT & CONNECTION STATUS -->
-        <div class="flex items-center space-x-3">
-            <div class="relative">
-                <input type="password" id="api-token" placeholder="Enter Deriv API Token" 
-                       class="bg-slate-900 border border-slate-700 text-sm text-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-red-500 w-52">
-                <button onclick="toggleTokenVisibility()" class="absolute right-2 top-2 text-slate-400 text-xs">
-                    <i id="eye-icon" class="fa-solid fa-eye"></i>
-                </button>
-            </div>
-            <button onclick="connectAPI()" id="btn-connect" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition duration-200 flex items-center space-x-1">
-                <i class="fa-solid fa-plug"></i>
-                <span>Connect</span>
-            </button>
-            <span id="connection-status" class="w-3 h-3 rounded-full bg-red-500 inline-block" title="Disconnected"></span>
-        </div>
-    </header>
-
-    <!-- MAIN APP CONTAINER -->
-    <div class="flex flex-1 overflow-hidden">
-
-        <!-- SIDEBAR NAVIGATION -->
-        <aside class="w-64 glass border-r border-slate-800 p-4 flex flex-col justify-between">
-            <nav class="space-y-2">
-                <button onclick="switchTab('dashboard')" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 active bg-slate-800 font-semibold" id="btn-dashboard">
-                    <i class="fa-solid fa-gauge text-red-400 w-5"></i><span>Dashboard</span>
-                </button>
-                <button onclick="switchTab('free-bots')" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400" id="btn-free-bots">
-                    <i class="fa-solid fa-robot text-blue-400 w-5"></i><span>Free Bots</span>
-                </button>
-                <button onclick="switchTab('sniper-entry')" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400" id="btn-sniper-entry">
-                    <i class="fa-solid fa-crosshairs text-amber-400 w-5"></i><span>Sniper Entry</span>
-                </button>
-                <button onclick="switchTab('copy-trading')" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400" id="btn-copy-trading">
-                    <i class="fa-solid fa-copy text-emerald-400 w-5"></i><span>Copy Trading</span>
-                </button>
-                <button onclick="switchTab('premium-bot')" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400" id="btn-premium-bot">
-                    <i class="fa-solid fa-crown text-purple-400 w-5"></i><span>Premium Bot</span>
-                </button>
-                <button onclick="switchTab('calculator')" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-400" id="btn-calculator">
-                    <i class="fa-solid fa-calculator text-teal-400 w-5"></i><span>Calculator</span>
-                </button>
-            </nav>
-            <div class="text-xs text-slate-500 text-center p-2">
-                Engine v1.0.0 | Connected via WebSocket
-            </div>
-        </aside>
-
-        <!-- CONTENT VIEWS -->
-        <main class="flex-1 overflow-y-auto p-6">
-
-            <!-- 1. DASHBOARD TAB -->
-            <section id="tab-dashboard" class="tab-content active space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="glass p-5 rounded-2xl">
-                        <p class="text-xs text-slate-400 uppercase font-semibold">Account Status</p>
-                        <h3 id="dash-account-type" class="text-xl font-bold text-white mt-1">Not Connected</h3>
-                        <p id="dash-account-id" class="text-xs text-slate-500 mt-1">Please enter API token</p>
-                    </div>
-                    <div class="glass p-5 rounded-2xl">
-                        <p class="text-xs text-slate-400 uppercase font-semibold">Live Balance</p>
-                        <h3 id="dash-balance" class="text-2xl font-bold text-emerald-400 mt-1">$0.00</h3>
-                        <p class="text-xs text-slate-500 mt-1">Updated real-time</p>
-                    </div>
-                    <div class="glass p-5 rounded-2xl">
-                        <p class="text-xs text-slate-400 uppercase font-semibold">Market Tick Stream</p>
-                        <h3 id="live-tick" class="text-2xl font-mono font-bold text-blue-400 mt-1">---</h3>
-                        <p class="text-xs text-slate-500 mt-1">Volatility 100 Index</p>
-                    </div>
-                </div>
-
-                <!-- API Activity Console -->
-                <div class="glass p-5 rounded-2xl space-y-3">
-                    <h3 class="font-bold text-sm text-slate-300 flex items-center space-x-2">
-                        <i class="fa-solid fa-terminal text-slate-400"></i>
-                        <span>System Activity Console</span>
-                    </h3>
-                    <div id="console-log" class="bg-slate-950 p-4 rounded-xl h-64 overflow-y-auto text-xs font-mono text-emerald-400 space-y-1">
-                        <div>[SYSTEM] Application initialized. Awaiting API connection...</div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 2. FREE BOTS TAB -->
-            <section id="tab-free-bots" class="tab-content space-y-6">
-                <div class="glass p-6 rounded-2xl border border-dashed border-blue-500/30">
-                    <div class="flex items-center space-x-3 mb-4">
-                        <i class="fa-solid fa-robot text-2xl text-blue-400"></i>
-                        <div>
-                            <h2 class="text-lg font-bold">Free Bots Library</h2>
-                            <p class="text-xs text-slate-400">Plug in your custom strategy scripts or XML definitions below.</p>
-                        </div>
-                    </div>
-                    
-                    <!-- USER CUSTOM FREE BOTS PLACEHOLDER -->
-                    <div id="free-bots-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Custom Bot Card 1 -->
-                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-                            <h4 class="font-bold text-sm text-blue-400">Rise / Fall Martingale Bot</h4>
-                            <p class="text-xs text-slate-400 my-2">Executes trades based on consecutive tick direction trends.</p>
-                            <button onclick="runCustomFreeBot('RiseFallBot')" class="w-full bg-blue-600 hover:bg-blue-700 text-xs font-bold py-2 rounded-lg transition">
-                                Start Free Bot
-                            </button>
-                        </div>
-                        <!-- Add your new bots here -->
-                    </div>
-                </div>
-            </section>
-
-            <!-- 3. SNIPER ENTRY TAB -->
-            <section id="tab-sniper-entry" class="tab-content space-y-6">
-                <div class="glass p-6 rounded-2xl max-w-xl mx-auto space-y-4">
-                    <h2 class="text-lg font-bold text-amber-400 flex items-center space-x-2">
-                        <i class="fa-solid fa-crosshairs"></i>
-                        <span>High Precision Sniper Entry</span>
-                    </h2>
-                    
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="text-xs text-slate-400 block mb-1">Select Market</label>
-                            <select id="sniper-symbol" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm">
-                                <option value="R_100">Volatility 100 Index</option>
-                                <option value="R_75">Volatility 75 Index</option>
-                                <option value="R_50">Volatility 50 Index</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400 block mb-1">Stake ($)</label>
-                            <input type="number" id="sniper-stake" value="10" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="text-xs text-slate-400 block mb-1">Contract Duration (Ticks)</label>
-                            <input type="number" id="sniper-ticks" value="1" min="1" max="10" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400 block mb-1">Target Pattern Trigger</label>
-                            <select id="sniper-pattern" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm">
-                                <option value="3_UP">3 Consecutive Ticks UP</option>
-                                <option value="3_DOWN">3 Consecutive Ticks DOWN</option>
-                                <option value="EVEN">Last Digit Even</option>
-                                <option value="ODD">Last Digit Odd</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="pt-2 flex space-x-3">
-                        <button onclick="startSniperMode()" id="btn-sniper-start" class="flex-1 bg-amber-500 hover:bg-amber-600 font-bold py-2.5 rounded-lg text-slate-950 transition">
-                            Arm Sniper Engine
-                        </button>
-                        <button onclick="stopSniperMode()" id="btn-sniper-stop" class="bg-slate-700 hover:bg-slate-600 font-bold px-4 rounded-lg text-xs transition hidden">
-                            Disarm
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 4. COPY TRADING TAB -->
-            <section id="tab-copy-trading" class="tab-content space-y-6">
-                <div class="glass p-6 rounded-2xl max-w-2xl mx-auto space-y-4">
-                    <h2 class="text-lg font-bold text-emerald-400 flex items-center space-x-2">
-                        <i class="fa-solid fa-copy"></i>
-                        <span>Copy Trading Station</span>
-                    </h2>
-                    
-                    <div class="space-y-3">
-                        <div>
-                            <label class="text-xs text-slate-400 block mb-1">Master Account Token (Trader to Copy)</label>
-                            <input type="password" id="copy-master-token" placeholder="Paste Master API Token" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm">
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-xs text-slate-400 block mb-1">Max Stake per Trade ($)</label>
-                                <input type="number" id="copy-max-stake" value="50" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm">
-                            </div>
-                            <div>
-                                <label class="text-xs text-slate-400 block mb-1">Multiplier</label>
-                                <input type="number" id="copy-multiplier" value="1.0" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm">
-                            </div>
-                        </div>
-                    </div>
-
-                    <button onclick="toggleCopyTrading()" id="btn-copy-trade" class="w-full bg-emerald-600 hover:bg-emerald-700 font-bold py-2.5 rounded-lg transition">
-                        Start Copying Trades
-                    </button>
-                </div>
-            </section>
-
-            <!-- 5. PREMIUM BOT TAB -->
-            <section id="tab-premium-bot" class="tab-content space-y-6">
-                <div class="glass p-6 rounded-2xl border border-purple-500/30">
-                    <div class="flex items-center space-x-3 mb-4">
-                        <i class="fa-solid fa-crown text-2xl text-purple-400"></i>
-                        <div>
-                            <h2 class="text-lg font-bold text-purple-300">Premium Bot Suite</h2>
-                            <p class="text-xs text-slate-400">Advanced strategies, AI pattern recognition, and protected execution routines.</p>
-                        </div>
-                    </div>
-
-                    <!-- USER CUSTOM PREMIUM BOTS PLACEHOLDER -->
-                    <div id="premium-bots-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Premium Bot Card Sample -->
-                        <div class="bg-slate-900 border border-purple-900/50 p-4 rounded-xl">
-                            <div class="flex justify-between items-center mb-2">
-                                <h4 class="font-bold text-sm text-purple-400">AI Digit Differ Sniper</h4>
-                                <span class="bg-purple-900/50 text-purple-300 text-[10px] px-2 py-0.5 rounded border border-purple-700">PREMIUM</span>
-                            </div>
-                            <p class="text-xs text-slate-400 mb-3">Statistically calculates least frequent digits before sending entry orders.</p>
-                            <button onclick="runCustomPremiumBot('AIDigitDiffer')" class="w-full bg-purple-600 hover:bg-purple-700 text-xs font-bold py-2 rounded-lg transition">
-                                Execute Premium Bot
-                            </button>
-                        </div>
-                        <!-- Add your encrypted or locked premium bots here -->
-                    </div>
-                </div>
-            </section>
-
-            <!-- 6. CALCULATOR TAB -->
-            <section id="tab-calculator" class="tab-content space-y-6">
-                <div class="glass p-6 rounded-2xl max-w-xl mx-auto space-y-4">
-                    <h2 class="text-lg font-bold text-teal-400 flex items-center space-x-2">
-                        <i class="fa-solid fa-calculator"></i>
-                        <span>Martingale & Risk Calculator</span>
-                    </h2>
-
-                    <div class="grid grid-cols-3 gap-3">
-                        <div>
-                            <label class="text-xs text-slate-400 block mb-1">Base Stake ($)</label>
-                            <input type="number" id="calc-base" value="1" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm" oninput="calculateMartingale()">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400 block mb-1">Multiplier</label>
-                            <input type="number" id="calc-multiplier" value="2.1" step="0.1" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm" oninput="calculateMartingale()">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400 block mb-1">Max Loss Steps</label>
-                            <input type="number" id="calc-steps" value="5" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm" oninput="calculateMartingale()">
-                        </div>
-                    </div>
-
-                    <div class="bg-slate-900 p-4 rounded-xl space-y-2 border border-slate-800">
-                        <div class="flex justify-between text-xs">
-                            <span class="text-slate-400">Total Required Capital:</span>
-                            <span id="calc-total-capital" class="font-bold text-teal-400">$0.00</span>
-                        </div>
-                        <div class="flex justify-between text-xs">
-                            <span class="text-slate-400">Max Exposure Trade:</span>
-                            <span id="calc-max-trade" class="font-bold text-amber-400">$0.00</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-        </main>
+      </div>
+      <div class="flex items-center gap-2">
+        <input id="token" type="password" placeholder="Deriv API token" class="w-48 px-3 py-2 rounded-lg text-xs">
+        <button id="connectBtn" onclick="connect()" class="btn btn-gold">CONNECT</button>
+      </div>
     </div>
+    <div class="flex gap-2 overflow-x-auto pt-3">
+      <button class="navbtn active" onclick="showPage('dashboard',this)">DASHBOARD</button>
+      <button class="navbtn" onclick="showPage('forex-signal',this)">FOREX SIGNAL</button>
+      <button class="navbtn" onclick="showPage('sniper',this)">SNIPER ENTRY</button>
+      <button class="navbtn" onclick="showPage('analysis',this)">ANALYSIS ENGINE</button>
+      <button class="navbtn" onclick="showPage('free-bots',this)">FREE BOTS</button>
+      <button class="navbtn" onclick="showPage('calculator',this)">CALCULATOR</button>
+    </div>
+  </div>
+</header>
 
-    <!-- JAVASCRIPT APPLICATION LOGIC -->
-    <script>
-        // GLOBAL APP STATE
-        const APP_ID = 1089; // Default Public Deriv App ID
-        let ws = null;
-        let isConnected = false;
-        let sniperActive = false;
-        let lastTicks = [];
+<main class="max-w-7xl mx-auto p-4">
+  <div class="flex gap-2 mb-4">
+    <button id="demoBtn" onclick="setAccountMode('demo')" class="btn btn-dark">DEMO</button>
+    <button id="realBtn" onclick="setAccountMode('real')" class="btn btn-dark">REAL</button>
+    <span class="text-xs text-gray-500 self-center ml-2">Account display only. Deriv authorization determines the actual account.</span>
+  </div>
 
-        // UI TAB SWITCHER
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active', 'bg-slate-800', 'text-slate-300'));
-            
-            document.getElementById(`tab-${tabId}`).classList.add('active');
-            const btn = document.getElementById(`btn-${tabId}`);
-            if(btn) btn.classList.add('active', 'bg-slate-800', 'text-slate-300');
-        }
+  <section id="dashboard" class="page active space-y-5">
+    <div class="flex items-end justify-between flex-wrap gap-3">
+      <div><p class="text-xs text-gray-500">DASHBOARD</p><h1 class="text-3xl font-black">FOREX SIGNAL</h1><p class="text-gray-400 text-sm">Sniper entry and live forex analysis.</p></div>
+      <button onclick="showPage('sniper')" class="btn btn-gold">OPEN SNIPER ENTRY</button>
+    </div>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="metric"><div class="text-xs text-gray-500">ACCOUNT</div><div id="dashAccount" class="font-bold mt-2">NOT CONNECTED</div></div>
+      <div class="metric"><div class="text-xs text-gray-500">BALANCE</div><div id="dashBalance" class="font-bold text-xl mt-2">$0.00</div></div>
+      <div class="metric"><div class="text-xs text-gray-500">MARKET</div><div id="dashMarket" class="font-bold mt-2">EUR/USD</div></div>
+      <div class="metric"><div class="text-xs text-gray-500">LAST PRICE</div><div id="dashPrice" class="font-bold text-xl mt-2">--</div></div>
+    </div>
+    <div class="panel p-5">
+      <h2 class="font-black">FOREX SIGNAL</h2>
+      <div class="grid md:grid-cols-4 gap-3 mt-4">
+        <div class="metric"><span class="text-xs text-gray-500">TREND</span><div id="trend" class="text-xl font-black mt-1">WAITING</div></div>
+        <div class="metric"><span class="text-xs text-gray-500">ENTRY</span><div id="entry" class="text-xl font-black mt-1">--</div></div>
+        <div class="metric"><span class="text-xs text-gray-500">CONFIDENCE</span><div id="confidence" class="text-xl font-black mt-1">--</div></div>
+        <div class="metric"><span class="text-xs text-gray-500">STREAM</span><div id="streamState" class="text-xl font-black mt-1">OFFLINE</div></div>
+      </div>
+    </div>
+  </section>
 
-        // TOGGLE API TOKEN VISIBILITY
-        function toggleTokenVisibility() {
-            const input = document.getElementById('api-token');
-            const icon = document.getElementById('eye-icon');
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.classList.replace('fa-eye', 'fa-eye-slash');
-            } else {
-                input.type = 'password';
-                icon.classList.replace('fa-eye-slash', 'fa-eye');
-            }
-        }
+  <section id="forex-signal" class="page space-y-5">
+    <div><p class="text-xs text-gray-500">FOREX SIGNAL</p><h1 class="text-3xl font-black">FOREX SIGNAL</h1><p class="text-gray-400 text-sm">Live Deriv forex market feed and directional analysis.</p></div>
+    <div class="panel p-5">
+      <div class="grid md:grid-cols-3 gap-3">
+        <label class="text-xs text-gray-400">MARKET<select id="signalMarket" onchange="changeMarket(this.value)" class="w-full mt-2 p-3 rounded-lg">
+          <option value="frxEURUSD">EUR/USD</option><option value="frxGBPUSD">GBP/USD</option><option value="frxUSDJPY">USD/JPY</option><option value="frxAUDUSD">AUD/USD</option><option value="frxUSDCAD">USD/CAD</option><option value="frxUSDCHF">USD/CHF</option><option value="frxXAUUSD">XAU/USD</option>
+        </select></label>
+        <div class="metric"><span class="text-xs text-gray-500">LIVE PRICE</span><div id="signalPrice" class="text-2xl font-black mt-2">--</div></div>
+        <div class="metric"><span class="text-xs text-gray-500">DIRECTION</span><div id="signalDirection" class="text-2xl font-black mt-2">WAITING</div></div>
+      </div>
+    </div>
+  </section>
 
-        // LOGGER UTILITY
-        function log(msg, type = 'info') {
-            const consoleBox = document.getElementById('console-log');
-            const time = new Date().toLocaleTimeString();
-            const color = type === 'error' ? 'text-red-400' : type === 'success' ? 'text-emerald-400' : 'text-slate-300';
-            consoleBox.innerHTML += `<div class="${color}">[${time}] ${msg}</div>`;
-            consoleBox.scrollTop = consoleBox.scrollHeight;
-        }
+  <section id="sniper" class="page space-y-5">
+    <div><p class="text-xs text-gray-500">SNIPER ENTRY</p><h1 class="text-3xl font-black">SNIPER ENTRY</h1><p class="text-gray-400 text-sm">Configure the market, contract, stake and martingale before starting analysis.</p></div>
+    <div class="grid lg:grid-cols-3 gap-4">
+      <div class="panel p-5 lg:col-span-2">
+        <div class="grid md:grid-cols-2 gap-4">
+          <label class="text-xs text-gray-400">MARKET<select id="sniperMarket" onchange="changeMarket(this.value)" class="w-full mt-2 p-3 rounded-lg">
+            <option value="frxEURUSD">EUR/USD</option><option value="frxGBPUSD">GBP/USD</option><option value="frxUSDJPY">USD/JPY</option><option value="frxAUDUSD">AUD/USD</option><option value="frxUSDCAD">USD/CAD</option><option value="frxUSDCHF">USD/CHF</option><option value="frxXAUUSD">XAU/USD</option>
+          </select></label>
+          <label class="text-xs text-gray-400">CONTRACT TYPE<select id="contractType" class="w-full mt-2 p-3 rounded-lg"><option value="CALL">CALL</option><option value="PUT">PUT</option></select></label>
+          <label class="text-xs text-gray-400">STAKE (USD)<input id="stake" type="number" min="0.35" step="0.01" value="1" class="w-full mt-2 p-3 rounded-lg"></label>
+          <label class="text-xs text-gray-400">MARTINGALE<input id="martingale" type="number" min="1" step="0.1" value="2" class="w-full mt-2 p-3 rounded-lg"></label>
+          <label class="text-xs text-gray-400">DURATION (TICKS)<input id="duration" type="number" min="1" max="10" value="1" class="w-full mt-2 p-3 rounded-lg"></label>
+          <label class="text-xs text-gray-400">MAX MARTINGALE STEPS<input id="maxSteps" type="number" min="0" max="10" value="3" class="w-full mt-2 p-3 rounded-lg"></label>
+        </div>
+        <div class="flex items-center justify-between mt-5 p-4 rounded-xl bg-[#080808] border border-[#242424]">
+          <div><div class="font-black">AUTO TRADE</div><div class="text-xs text-gray-500">OFF by default. Turn on only when you want the engine to execute.</div></div>
+          <button id="autoTrade" onclick="toggleAutoTrade()" class="btn btn-dark">OFF</button>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mt-4">
+          <button id="startAnalysis" onclick="startSniper()" class="btn btn-gold">START ANALYSIS</button>
+          <button id="stopAnalysis" onclick="stopSniper()" class="btn btn-dark" disabled>STOP</button>
+        </div>
+      </div>
+      <div class="panel p-5">
+        <div class="text-xs text-gray-500">SNIPER STATUS</div>
+        <div id="sniperStatus" class="text-2xl font-black mt-2">STOPPED</div>
+        <div class="mt-5 space-y-3 text-sm">
+          <div class="flex justify-between"><span class="text-gray-500">Market</span><b id="sniperMarketLabel">EUR/USD</b></div>
+          <div class="flex justify-between"><span class="text-gray-500">Stake</span><b id="stakeLabel">$1.00</b></div>
+          <div class="flex justify-between"><span class="text-gray-500">Next stake</span><b id="nextStake">$1.00</b></div>
+          <div class="flex justify-between"><span class="text-gray-500">Trades</span><b id="tradeCount">0</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel p-5">
+      <h2 class="font-black">TRANSACTION / TRADE LOG</h2>
+      <div id="tradeLog" class="log mt-3 max-h-64 overflow-auto space-y-1"><div class="text-gray-500">No transaction started.</div></div>
+    </div>
+  </section>
 
-        // WEBSOCKET API CONNECTION ENGINE
-        function connectAPI() {
-            const token = document.getElementById('api-token').value.trim();
-            if (!token) {
-                alert('Please enter your Deriv API token.');
-                return;
-            }
+  <section id="analysis" class="page space-y-5">
+    <div><p class="text-xs text-gray-500">ANALYSIS ENGINE</p><h1 class="text-3xl font-black">ANALYSIS ENGINE</h1><p class="text-gray-400 text-sm">Live pipeline. Auto trade is controlled from Sniper Entry.</p></div>
+    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="metric"><span class="text-xs text-gray-500">MARKET</span><div id="engineMarket" class="font-black mt-2">EUR/USD</div></div>
+      <div class="metric"><span class="text-xs text-gray-500">PRICE</span><div id="enginePrice" class="font-black mt-2">--</div></div>
+      <div class="metric"><span class="text-xs text-gray-500">SIGNAL</span><div id="engineSignal" class="font-black mt-2">WAITING</div></div>
+      <div class="metric"><span class="text-xs text-gray-500">ENGINE</span><div id="engineState" class="font-black mt-2">STOPPED</div></div>
+    </div>
+    <div class="panel p-5">
+      <div class="grid md:grid-cols-5 gap-2 text-center text-xs font-bold">
+        <div class="metric">LIVE DERIV TICKS</div><div class="metric">ANALYSIS</div><div class="metric">PREDICTION / SIGNAL</div><div class="metric">RISK CHECK</div><div class="metric">DERIV PROPOSAL → BUY</div>
+      </div>
+    </div>
+  </section>
 
-            log('Connecting to Deriv WebSocket Server...');
-            ws = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`);
+  <section id="free-bots" class="page space-y-5">
+    <div><p class="text-xs text-gray-500">FREE BOTS</p><h1 class="text-3xl font-black">FREE BOTS</h1></div>
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="panel p-5"><h2 class="font-black">FOREX TREND HUNTER</h2><p class="text-xs text-gray-500 mt-2">Live directional monitoring.</p><button onclick="startSniper()" class="btn btn-gold w-full mt-4">START</button></div>
+      <div class="panel p-5"><h2 class="font-black">FOREX SNIPER</h2><p class="text-xs text-gray-500 mt-2">Uses the Sniper Entry configuration.</p><button onclick="showPage('sniper')" class="btn btn-dark w-full mt-4">OPEN</button></div>
+    </div>
+  </section>
 
-            ws.onopen = () => {
-                log('WebSocket Connected. Requesting Authorization...', 'success');
-                ws.send(JSON.stringify({ authorize: token }));
-            };
+  <section id="calculator" class="page space-y-5">
+    <div><p class="text-xs text-gray-500">CALCULATOR</p><h1 class="text-3xl font-black">MARTINGALE CALCULATOR</h1></div>
+    <div class="panel p-5 max-w-xl">
+      <div class="grid grid-cols-3 gap-3">
+        <label class="text-xs text-gray-400">BASE<input id="calcBase" type="number" value="1" step="0.01" class="w-full mt-2 p-3 rounded-lg" oninput="calc()"></label>
+        <label class="text-xs text-gray-400">MULTIPLIER<input id="calcMult" type="number" value="2" step="0.1" class="w-full mt-2 p-3 rounded-lg" oninput="calc()"></label>
+        <label class="text-xs text-gray-400">STEPS<input id="calcSteps" type="number" value="3" class="w-full mt-2 p-3 rounded-lg" oninput="calc()"></label>
+      </div>
+      <div class="metric mt-4"><span class="text-xs text-gray-500">TOTAL CAPITAL</span><div id="calcTotal" class="text-2xl font-black mt-1">$7.00</div></div>
+    </div>
+  </section>
+</main>
 
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
+<script>
+const APP_ID=1089;
+let ws=null, connected=false, sniperActive=false, autoTrade=false, currentSymbol='frxEURUSD';
+let ticks=[], currentStake=1, lossStep=0, tradeCount=0, lastTradeTime=0;
+const names={frxEURUSD:'EUR/USD',frxGBPUSD:'GBP/USD',frxUSDJPY:'USD/JPY',frxAUDUSD:'AUD/USD',frxUSDCAD:'USD/CAD',frxUSDCHF:'USD/CHF',frxXAUUSD:'XAU/USD'};
 
-                // Handle Auth Response
-                if (data.msg_type === 'authorize') {
-                    if (data.error) {
-                        log(`Authorization Failed: ${data.error.message}`, 'error');
-                        return;
-                    }
-
-                    isConnected = true;
-                    document.getElementById('connection-status').className = 'w-3 h-3 rounded-full bg-emerald-500 inline-block';
-                    
-                    // Parse Account Info
-                    const auth = data.authorize;
-                    const isVirtual = Boolean(auth.is_virtual);
-                    const accountTypeStr = isVirtual ? 'Demo Account' : 'Real Account';
-                    
-                    // Update UI Badges
-                    document.getElementById('account-badge').classList.remove('hidden');
-                    document.getElementById('account-badge').classList.add('flex');
-                    document.getElementById('account-type').innerText = isVirtual ? 'DEMO' : 'REAL';
-                    document.getElementById('account-type').className = `text-xs uppercase px-2 py-0.5 rounded font-bold mr-3 text-white ${isVirtual ? 'bg-amber-600' : 'bg-emerald-600'}`;
-                    document.getElementById('account-id').innerText = auth.loginid;
-                    document.getElementById('account-balance').innerText = parseFloat(auth.balance).toFixed(2);
-
-                    // Dashboard Info
-                    document.getElementById('dash-account-type').innerText = accountTypeStr;
-                    document.getElementById('dash-account-id').innerText = auth.loginid;
-                    document.getElementById('dash-balance').innerText = `$${parseFloat(auth.balance).toFixed(2)}`;
-
-                    log(`Successfully Authenticated as ${auth.loginid} (${accountTypeStr})`, 'success');
-
-                    // Subscribe to real-time balance updates
-                    ws.send(JSON.stringify({ balance: 1, subscribe: 1 }));
-                    
-                    // Subscribe to Volatility 100 Index Ticks
-                    ws.send(JSON.stringify({ ticks: 'R_100', subscribe: 1 }));
-                }
-
-                // Balance Stream Update
-                if (data.msg_type === 'balance') {
-                    if (data.balance) {
-                        const bal = parseFloat(data.balance.balance).toFixed(2);
-                        document.getElementById('account-balance').innerText = bal;
-                        document.getElementById('dash-balance').innerText = `$${bal}`;
-                    }
-                }
-
-                // Tick Stream Update
-                if (data.msg_type === 'tick') {
-                    const tick = data.tick;
-                    if (tick) {
-                        document.getElementById('live-tick').innerText = tick.quote;
-                        processSniperLogic(tick.quote);
-                    }
-                }
-
-                // Proposal / Buy responses
-                if (data.msg_type === 'buy') {
-                    if (data.error) {
-                        log(`Order Failed: ${data.error.message}`, 'error');
-                    } else {
-                        log(`Order Executed Successfully! Contract ID: ${data.buy.contract_id}`, 'success');
-                    }
-                }
-            };
-
-            ws.onerror = (err) => {
-                log('WebSocket Connection Error', 'error');
-            };
-
-            ws.onclose = () => {
-                isConnected = false;
-                document.getElementById('connection-status').className = 'w-3 h-3 rounded-full bg-red-500 inline-block';
-                log('WebSocket Disconnected', 'error');
-            };
-        }
-
-        // SNIPER ENTRY LOGIC ENGINE
-        function startSniperMode() {
-            if (!isConnected) {
-                alert('Connect your API Token first!');
-                return;
-            }
-            sniperActive = true;
-            document.getElementById('btn-sniper-start').classList.add('hidden');
-            document.getElementById('btn-sniper-stop').classList.remove('hidden');
-            log('Sniper Mode ARMED and monitoring ticks...', 'success');
-        }
-
-        function stopSniperMode() {
-            sniperActive = false;
-            document.getElementById('btn-sniper-start').classList.remove('hidden');
-            document.getElementById('btn-sniper-stop').classList.add('hidden');
-            log('Sniper Mode DISARMED.');
-        }
-
-        function processSniperLogic(currentPrice) {
-            if (!sniperActive) return;
-
-            lastTicks.push(parseFloat(currentPrice));
-            if (lastTicks.length > 5) lastTicks.shift();
-
-            if (lastTicks.length < 3) return;
-
-            const pattern = document.getElementById('sniper-pattern').value;
-            let trigger = false;
-
-            if (pattern === '3_UP' && lastTicks[2] > lastTicks[1] && lastTicks[1] > lastTicks[0]) {
-                trigger = true;
-            } else if (pattern === '3_DOWN' && lastTicks[2] < lastTicks[1] && lastTicks[1] < lastTicks[0]) {
-                trigger = true;
-            }
-
-            if (trigger) {
-                log('Sniper Target Condition Met! Executing trade...', 'success');
-                executeOrder('CALL');
-                stopSniperMode(); // Auto-disarm after entry
-            }
-        }
-
-        // CONTRACT ORDER EXECUTION
-        function executeOrder(contractType = 'CALL') {
-            const symbol = document.getElementById('sniper-symbol').value;
-            const stake = document.getElementById('sniper-stake').value;
-            const ticks = document.getElementById('sniper-ticks').value;
-
-            const request = {
-                buy: 1,
-                price: parseFloat(stake),
-                parameters: {
-                    amount: parseFloat(stake),
-                    basis: 'stake',
-                    contract_type: contractType,
-                    currency: 'USD',
-                    duration: parseInt(ticks),
-                    duration_unit: 't',
-                    symbol: symbol
-                }
-            };
-            ws.send(JSON.stringify(request));
-        }
-
-        // COPY TRADING ROUTINE
-        let copyTradingActive = false;
-        function toggleCopyTrading() {
-            if(!isConnected) { alert('Connect your API token first'); return; }
-            copyTradingActive = !copyTradingActive;
-            const btn = document.getElementById('btn-copy-trade');
-            if (copyTradingActive) {
-                btn.innerText = 'Stop Copy Trading';
-                btn.className = 'w-full bg-red-600 hover:bg-red-700 font-bold py-2.5 rounded-lg transition';
-                log('Copy Trading Activated - Listening to Master Stream');
-            } else {
-                btn.innerText = 'Start Copying Trades';
-                btn.className = 'w-full bg-emerald-600 hover:bg-emerald-700 font-bold py-2.5 rounded-lg transition';
-                log('Copy Trading Stopped');
-            }
-        }
-
-        // CALCULATOR ENGINE
-        function calculateMartingale() {
-            const base = parseFloat(document.getElementById('calc-base').value) || 0;
-            const mult = parseFloat(document.getElementById('calc-multiplier').value) || 0;
-            const steps = parseInt(document.getElementById('calc-steps').value) || 0;
-
-            let total = 0;
-            let currentStake = base;
-
-            for(let i = 0; i < steps; i++) {
-                total += currentStake;
-                if (i < steps - 1) currentStake *= mult;
-            }
-
-            document.getElementById('calc-total-capital').innerText = `$${total.toFixed(2)}`;
-            document.getElementById('calc-max-trade').innerText = `$${currentStake.toFixed(2)}`;
-        }
-
-        // ================================================================
-        // PLACEHOLDERS FOR YOUR FREE AND PREMIUM BOTS
-        // ================================================================
-
-        function runCustomFreeBot(botName) {
-            if(!isConnected) { alert('Please connect API Token first.'); return; }
-            log(`Running Free Bot: ${botName}...`);
-            // === ADD YOUR FREE BOT LOGIC HERE ===
-        }
-
-        function runCustomPremiumBot(botName) {
-            if(!isConnected) { alert('Please connect API Token first.'); return; }
-            log(`Running Premium Bot: ${botName}...`);
-            // === ADD YOUR PREMIUM BOT LOGIC HERE ===
-        }
-
-        // Initialize Calculator
-        calculateMartingale();
-    </script>
+function showPage(id,btn){
+ document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+ document.getElementById(id).classList.add('active');
+ if(btn){document.querySelectorAll('.navbtn').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
+}
+function setAccountMode(mode){
+ document.getElementById('demoBtn').className='btn '+(mode==='demo'?'btn-gold':'btn-dark');
+ document.getElementById('realBtn').className='btn '+(mode==='real'?'btn-gold':'btn-dark');
+}
+function logTrade(m){const box=document.getElementById('tradeLog');if(box.children.length===1&&box.firstElementChild.textContent.includes('No transaction'))box.innerHTML='';const d=document.createElement('div');d.textContent='['+new Date().toLocaleTimeString()+'] '+m;box.prepend(d)}
+function setConnected(v){connected=v;document.getElementById('wsDot').className='status-dot '+(v?'on':'');document.getElementById('wsText').textContent=v?'CONNECTED':'DISCONNECTED';document.getElementById('streamState').textContent=v?'LIVE':'OFFLINE'}
+function connect(){
+ const token=document.getElementById('token').value.trim(); if(!token){alert('Enter your Deriv API token.');return}
+ if(ws)try{ws.close()}catch(e){}
+ ws=new WebSocket('wss://ws.derivws.com/websockets/v3?app_id='+APP_ID);
+ ws.onopen=()=>ws.send(JSON.stringify({authorize:token}));
+ ws.onmessage=e=>{
+  const d=JSON.parse(e.data);
+  if(d.error){logTrade('ERROR: '+d.error.message);return}
+  if(d.msg_type==='authorize'){setConnected(true);const a=d.authorize;document.getElementById('dashAccount').textContent=a.loginid||'CONNECTED';document.getElementById('dashBalance').textContent='$'+Number(a.balance||0).toFixed(2);ws.send(JSON.stringify({balance:1,subscribe:1}));subscribeTicks()}
+  if(d.msg_type==='balance'&&d.balance)document.getElementById('dashBalance').textContent='$'+Number(d.balance.balance||0).toFixed(2);
+  if(d.msg_type==='tick'&&d.tick)handleTick(Number(d.tick.quote));
+  if(d.msg_type==='proposal'&&d.proposal)handleProposal(d.proposal);
+  if(d.msg_type==='buy'&&d.buy){tradeCount++;document.getElementById('tradeCount').textContent=tradeCount;logTrade('TRADE OPENED • CONTRACT '+d.buy.contract_id);ws.send(JSON.stringify({proposal_open_contract:1,contract_id:d.buy.contract_id,subscribe:1}))}
+  if(d.msg_type==='proposal_open_contract'&&d.proposal_open_contract)handleContract(d.proposal_open_contract);
+ };
+ ws.onclose=()=>setConnected(false); ws.onerror=()=>setConnected(false);
+}
+function subscribeTicks(){
+ if(!ws||ws.readyState!==1)return;
+ ws.send(JSON.stringify({forget_all:'ticks'})); ws.send(JSON.stringify({ticks:currentSymbol,subscribe:1}));
+}
+function changeMarket(s){
+ currentSymbol=s; document.getElementById('sniperMarket').value=s;document.getElementById('signalMarket').value=s;
+ document.getElementById('sniperMarketLabel').textContent=names[s];document.getElementById('dashMarket').textContent=names[s];document.getElementById('engineMarket').textContent=names[s];
+ ticks=[]; if(connected)subscribeTicks();
+}
+function handleTick(price){
+ document.getElementById('dashPrice').textContent=price;document.getElementById('signalPrice').textContent=price;document.getElementById('enginePrice').textContent=price;
+ ticks.push(price);if(ticks.length>20)ticks.shift();
+ if(ticks.length>=5){const up=ticks[ticks.length-1]>ticks[ticks.length-5];const dir=up?'CALL':'PUT';const conf=Math.min(95,55+Math.round(Math.abs(ticks[ticks.length-1]-ticks[0])/(Math.abs(ticks[0])||1)*100000));
+ document.getElementById('trend').textContent=up?'BULLISH':'BEARISH';document.getElementById('entry').textContent=dir;document.getElementById('confidence').textContent=conf+'%';document.getElementById('signalDirection').textContent=dir;document.getElementById('engineSignal').textContent=dir;
+ if(sniperActive)runSniper(dir,price);
+ }
+}
+function toggleAutoTrade(){autoTrade=!autoTrade;const b=document.getElementById('autoTrade');b.textContent=autoTrade?'ON':'OFF';b.className='btn '+(autoTrade?'btn-gold':'btn-dark');}
+function startSniper(){
+ if(!connected){alert('Connect the Deriv account first.');return}
+ sniperActive=true;currentStake=Math.max(.35,Number(document.getElementById('stake').value)||1);lossStep=0;
+ document.getElementById('sniperStatus').textContent='ANALYZING';document.getElementById('engineState').textContent='RUNNING';document.getElementById('startAnalysis').disabled=true;document.getElementById('stopAnalysis').disabled=false;
+ logTrade('ANALYSIS STARTED • '+names[currentSymbol]+' • '+document.getElementById('contractType').value+' • $'+currentStake.toFixed(2)+(autoTrade?' • AUTO TRADE ON':' • SIGNAL ONLY'));
+}
+function stopSniper(){sniperActive=false;document.getElementById('sniperStatus').textContent='STOPPED';document.getElementById('engineState').textContent='STOPPED';document.getElementById('startAnalysis').disabled=false;document.getElementById('stopAnalysis').disabled=true;logTrade('ANALYSIS STOPPED')}
+function runSniper(signal,price){
+ const chosen=document.getElementById('contractType').value;
+ if(signal!==chosen)return;
+ document.getElementById('nextStake').textContent='$'+currentStake.toFixed(2);
+ if(!autoTrade)return;
+ const now=Date.now();if(now-lastTradeTime<8000)return;
+ lastTradeTime=now; requestProposal(chosen);
+}
+function requestProposal(type){
+ if(!ws||ws.readyState!==1)return;
+ const duration=Math.max(1,parseInt(document.getElementById('duration').value)||1);
+ logTrade('SIGNAL CONFIRMED • REQUESTING DERIV PROPOSAL • '+type+' • $'+currentStake.toFixed(2));
+ ws.send(JSON.stringify({proposal:1,amount:Number(currentStake.toFixed(2)),basis:'stake',contract_type:type,currency:'USD',duration,duration_unit:'t',symbol:currentSymbol}));
+}
+function handleProposal(p){
+ if(!autoTrade||!sniperActive||!p.id)return;
+ ws.send(JSON.stringify({buy:p.id,price:Number(p.ask_price)}));
+}
+function handleContract(c){
+ if(c.is_sold){const profit=Number(c.profit||0);if(profit<0){lossStep++;const mult=Number(document.getElementById('martingale').value)||2;const max=Number(document.getElementById('maxSteps').value)||0;if(lossStep<=max){currentStake*=mult;logTrade('LOSS • MARTINGALE STEP '+lossStep+' • NEXT $'+currentStake.toFixed(2))}else{logTrade('LOSS LIMIT REACHED • ANALYSIS STOPPED');stopSniper()}}else{lossStep=0;currentStake=Math.max(.35,Number(document.getElementById('stake').value)||1);logTrade('WIN • STAKE RESET TO $'+currentStake.toFixed(2))}document.getElementById('nextStake').textContent='$'+currentStake.toFixed(2)}}
+function calc(){const b=Number(document.getElementById('calcBase').value)||0,m=Number(document.getElementById('calcMult').value)||0,s=Math.max(0,Number(document.getElementById('calcSteps').value)||0);let t=0,x=b;for(let i=0;i<s;i++){t+=x;x*=m}document.getElementById('calcTotal').textContent='$'+t.toFixed(2)}
+document.getElementById('stake').addEventListener('input',e=>{document.getElementById('stakeLabel').textContent='$'+Number(e.target.value||0).toFixed(2)});
+calc();setAccountMode('demo');
+</script>
 </body>
 </html>
