@@ -1,432 +1,116 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ELISY254 Forex Hunter</title>
+<title>ELISY254 FOREX HUNTER</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  *{box-sizing:border-box} body{margin:0;background:#070707;color:#f5f5f5;font-family:Inter,system-ui,sans-serif}
-  .panel{background:#101010;border:1px solid #242424;border-radius:16px}
-  .nav{background:#0b0b0b;border-bottom:1px solid #252525}
-  .navbtn{white-space:nowrap;padding:11px 16px;border-radius:10px;color:#9ca3af;font-size:13px;font-weight:700}
-  .navbtn.active{background:#f0b90b;color:#080808}
-  input,select{background:#080808!important;border:1px solid #303030!important;color:#fff!important}
-  .status-dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:#ef4444}
-  .status-dot.on{background:#22c55e}
-  .page{display:none}.page.active{display:block}
-  .btn{border-radius:10px;padding:11px 16px;font-weight:800;font-size:13px}
-  .btn-gold{background:#f0b90b;color:#080808}.btn-dark{background:#191919;border:1px solid #303030}
-  .metric{background:#0b0b0b;border:1px solid #222;border-radius:14px;padding:18px}
-  .log{font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px}
+*{box-sizing:border-box}body{margin:0;background:#070707;color:#f5f5f5;font-family:Inter,system-ui,sans-serif}
+.nav{background:#0b0b0b;border-bottom:1px solid #252525}.panel,.metric{background:#101010;border:1px solid #242424;border-radius:14px}.metric{padding:18px}
+.navbtn{white-space:nowrap;padding:10px 15px;border-radius:9px;color:#9ca3af;font-size:13px;font-weight:800}.navbtn.active{background:#f0b90b;color:#080808}
+.page{display:none}.page.active{display:block}input,select{background:#080808!important;border:1px solid #303030!important;color:#fff!important}.btn{border-radius:9px;padding:11px 15px;font-weight:800;font-size:13px}.gold{background:#f0b90b;color:#080808}.dark{background:#191919;border:1px solid #303030;color:#fff}.dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:#ef4444}.dot.on{background:#22c55e}.log{font:11px ui-monospace,SFMono-Regular,monospace}
 </style>
 </head>
 <body>
 <header class="nav sticky top-0 z-50">
-  <div class="max-w-7xl mx-auto px-4 py-3">
-    <div class="flex items-center justify-between gap-3 flex-wrap">
-      <div class="flex items-center gap-3">
-        <div class="font-black tracking-wide text-lg">ELISY254 <span class="text-yellow-400">FOREX HUNTER</span></div>
-        <div class="flex items-center gap-2 text-xs text-gray-400">
-          <span id="wsDot" class="status-dot"></span><span id="wsText">DISCONNECTED</span>
-        </div>
-      </div>
-      <div class="flex items-center gap-2">
-        <input id="token" type="password" placeholder="Legacy API token" class="w-40 px-3 py-2 rounded-lg text-xs">
-        <button id="connectBtn" onclick="connect()" class="btn btn-gold">CONNECT</button>
-        <input id="patToken" type="password" placeholder="Personal Access Token (PAT)" class="w-52 px-3 py-2 rounded-lg text-xs">
-        <button id="patBtn" onclick="connectPAT()" class="btn btn-dark">LOGIN PAT</button>
-      </div>
-    </div>
-    <div class="flex gap-2 overflow-x-auto pt-3">
-      <button class="navbtn active" onclick="showPage('dashboard',this)">DASHBOARD</button>
-      <button class="navbtn" onclick="showPage('forex-signal',this)">FOREX SIGNAL</button>
-      <button class="navbtn" onclick="showPage('sniper',this)">SNIPER ENTRY</button>
-      <button class="navbtn" onclick="showPage('analysis',this)">ANALYSIS ENGINE</button>
-      <button class="navbtn" onclick="showPage('free-bots',this)">FREE BOTS</button>
-      <button class="navbtn" onclick="showPage('calculator',this)">CALCULATOR</button>
-    </div>
-  </div>
-</header>
+<div class="max-w-7xl mx-auto px-4 py-3">
+<div class="flex items-center justify-between gap-3 flex-wrap">
+<div class="font-black text-lg">ELISY254 <span class="text-yellow-400">FOREX HUNTER</span><span class="ml-3 text-xs text-gray-400"><i id="dot" class="dot"></i> <span id="status">DISCONNECTED</span></span></div>
+<div class="flex gap-2 flex-wrap">
+<input id="token" type="password" placeholder="API token" class="w-36 px-3 py-2 rounded-lg text-xs">
+<button class="btn gold" onclick="connectLegacy()">CONNECT</button>
+<input id="pat" type="password" placeholder="Personal Access Token (PAT)" class="w-48 px-3 py-2 rounded-lg text-xs">
+<button class="btn dark" onclick="loginPAT()">LOGIN PAT</button>
+</div></div>
+<div class="flex gap-2 overflow-x-auto pt-3">
+<button class="navbtn active" onclick="page('dashboard',this)">DASHBOARD</button>
+<button class="navbtn" onclick="page('signal',this)">FOREX SIGNAL</button>
+<button class="navbtn" onclick="page('sniper',this)">SNIPER ENTRY</button>
+<button class="navbtn" onclick="page('engine',this)">ANALYSIS ENGINE</button>
+<button class="navbtn" onclick="page('bots',this)">FREE BOTS</button>
+<button class="navbtn" onclick="page('calc',this)">CALCULATOR</button>
+</div></div></header>
 
 <main class="max-w-7xl mx-auto p-4">
-  <div class="flex gap-2 mb-4">
-    <button id="demoBtn" onclick="setAccountMode('demo')" class="btn btn-dark">DEMO</button>
-    <button id="realBtn" onclick="setAccountMode('real')" class="btn btn-dark">REAL</button>
-    <span class="text-xs text-gray-500 self-center ml-2">Account display only. Deriv authorization determines the actual account.</span>
-  </div>
+<div class="flex gap-2 mb-4">
+<button id="demo" class="btn gold" onclick="mode('demo')">DEMO</button>
+<button id="real" class="btn dark" onclick="mode('real')">REAL</button>
+</div>
 
-  <section id="dashboard" class="page active space-y-5">
-    <div class="flex items-end justify-between flex-wrap gap-3">
-      <div><p class="text-xs text-gray-500">DASHBOARD</p><h1 class="text-3xl font-black">FOREX SIGNAL</h1><p class="text-gray-400 text-sm">Sniper entry and live forex analysis.</p></div>
-      <button onclick="showPage('sniper')" class="btn btn-gold">OPEN SNIPER ENTRY</button>
-    </div>
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <div class="metric"><div class="text-xs text-gray-500">ACCOUNT</div><div id="dashAccount" class="font-bold mt-2">NOT CONNECTED</div></div>
-      <div class="metric"><div class="text-xs text-gray-500">BALANCE</div><div id="dashBalance" class="font-bold text-xl mt-2">$0.00</div></div>
-      <div class="metric"><div class="text-xs text-gray-500">MARKET</div><div id="dashMarket" class="font-bold mt-2">EUR/USD</div></div>
-      <div class="metric"><div class="text-xs text-gray-500">LAST PRICE</div><div id="dashPrice" class="font-bold text-xl mt-2">--</div></div>
-    </div>
-    <div class="panel p-5">
-      <h2 class="font-black">FOREX SIGNAL</h2>
-      <div class="grid md:grid-cols-4 gap-3 mt-4">
-        <div class="metric"><span class="text-xs text-gray-500">TREND</span><div id="trend" class="text-xl font-black mt-1">WAITING</div></div>
-        <div class="metric"><span class="text-xs text-gray-500">ENTRY</span><div id="entry" class="text-xl font-black mt-1">--</div></div>
-        <div class="metric"><span class="text-xs text-gray-500">CONFIDENCE</span><div id="confidence" class="text-xl font-black mt-1">--</div></div>
-        <div class="metric"><span class="text-xs text-gray-500">STREAM</span><div id="streamState" class="text-xl font-black mt-1">OFFLINE</div></div>
-      </div>
-    </div>
-  </section>
+<section id="dashboard" class="page active space-y-4">
+<div><p class="text-xs text-gray-500">DASHBOARD</p><h1 class="text-3xl font-black">FOREX SIGNAL</h1><p class="text-gray-400 text-sm">Live market analysis and sniper entry.</p></div>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+<div class="metric"><small class="text-gray-500">ACCOUNT</small><div id="account" class="font-bold mt-2">NOT CONNECTED</div></div>
+<div class="metric"><small class="text-gray-500">BALANCE</small><div id="balance" class="font-bold text-xl mt-2">$0.00</div></div>
+<div class="metric"><small class="text-gray-500">MARKET</small><div id="marketText" class="font-bold mt-2">EUR/USD</div></div>
+<div class="metric"><small class="text-gray-500">LIVE PRICE</small><div id="price" class="font-bold text-xl mt-2">--</div></div>
+</div>
+<div class="panel p-5"><h2 class="font-black">FOREX SIGNAL</h2><div class="grid md:grid-cols-4 gap-3 mt-4">
+<div class="metric"><small class="text-gray-500">TREND</small><div id="trend" class="text-xl font-black mt-1">WAITING</div></div>
+<div class="metric"><small class="text-gray-500">ENTRY</small><div id="entry" class="text-xl font-black mt-1">--</div></div>
+<div class="metric"><small class="text-gray-500">CONFIDENCE</small><div id="confidence" class="text-xl font-black mt-1">--</div></div>
+<div class="metric"><small class="text-gray-500">STREAM</small><div id="stream" class="text-xl font-black mt-1">OFFLINE</div></div>
+</div></div></section>
 
-  <section id="forex-signal" class="page space-y-5">
-    <div><p class="text-xs text-gray-500">FOREX SIGNAL</p><h1 class="text-3xl font-black">FOREX SIGNAL</h1><p class="text-gray-400 text-sm">Live Deriv forex market feed and directional analysis.</p></div>
-    <div class="panel p-5">
-      <div class="grid md:grid-cols-3 gap-3">
-        <label class="text-xs text-gray-400">MARKET<select id="signalMarket" onchange="changeMarket(this.value)" class="w-full mt-2 p-3 rounded-lg">
-          <option value="frxEURUSD">EUR/USD</option><option value="frxGBPUSD">GBP/USD</option><option value="frxUSDJPY">USD/JPY</option><option value="frxAUDUSD">AUD/USD</option><option value="frxUSDCAD">USD/CAD</option><option value="frxUSDCHF">USD/CHF</option><option value="frxXAUUSD">XAU/USD</option>
-        </select></label>
-        <div class="metric"><span class="text-xs text-gray-500">LIVE PRICE</span><div id="signalPrice" class="text-2xl font-black mt-2">--</div></div>
-        <div class="metric"><span class="text-xs text-gray-500">DIRECTION</span><div id="signalDirection" class="text-2xl font-black mt-2">WAITING</div></div>
-      </div>
-    </div>
-  </section>
+<section id="signal" class="page space-y-4">
+<div><p class="text-xs text-gray-500">FOREX SIGNAL</p><h1 class="text-3xl font-black">FOREX SIGNAL</h1></div>
+<div class="panel p-5 grid md:grid-cols-3 gap-3">
+<label class="text-xs text-gray-400">MARKET<select id="signalMarket" class="w-full mt-2 p-3 rounded-lg" onchange="changeMarket(this.value)"><option value="frxEURUSD">EUR/USD</option><option value="frxGBPUSD">GBP/USD</option><option value="frxUSDJPY">USD/JPY</option><option value="frxAUDUSD">AUD/USD</option><option value="frxUSDCAD">USD/CAD</option><option value="frxUSDCHF">USD/CHF</option><option value="frxXAUUSD">XAU/USD</option></select></label>
+<div class="metric"><small class="text-gray-500">LIVE PRICE</small><div id="signalPrice" class="text-2xl font-black mt-2">--</div></div>
+<div class="metric"><small class="text-gray-500">DIRECTION</small><div id="direction" class="text-2xl font-black mt-2">WAITING</div></div>
+</div></section>
 
-  <section id="sniper" class="page space-y-5">
-    <div><p class="text-xs text-gray-500">SNIPER ENTRY</p><h1 class="text-3xl font-black">SNIPER ENTRY</h1><p class="text-gray-400 text-sm">Configure the market, contract, stake and martingale before starting analysis.</p></div>
-    <div class="grid lg:grid-cols-3 gap-4">
-      <div class="panel p-5 lg:col-span-2">
-        <div class="grid md:grid-cols-2 gap-4">
-          <label class="text-xs text-gray-400">MARKET<select id="sniperMarket" onchange="changeMarket(this.value)" class="w-full mt-2 p-3 rounded-lg">
-            <option value="frxEURUSD">EUR/USD</option><option value="frxGBPUSD">GBP/USD</option><option value="frxUSDJPY">USD/JPY</option><option value="frxAUDUSD">AUD/USD</option><option value="frxUSDCAD">USD/CAD</option><option value="frxUSDCHF">USD/CHF</option><option value="frxXAUUSD">XAU/USD</option>
-          </select></label>
-          <label class="text-xs text-gray-400">CONTRACT TYPE<select id="contractType" class="w-full mt-2 p-3 rounded-lg"><option value="CALL">CALL</option><option value="PUT">PUT</option></select></label>
-          <label class="text-xs text-gray-400">STAKE (USD)<input id="stake" type="number" min="0.35" step="0.01" value="1" class="w-full mt-2 p-3 rounded-lg"></label>
-          <label class="text-xs text-gray-400">MARTINGALE<input id="martingale" type="number" min="1" step="0.1" value="2" class="w-full mt-2 p-3 rounded-lg"></label>
-          <label class="text-xs text-gray-400">DURATION (TICKS)<input id="duration" type="number" min="1" max="10" value="1" class="w-full mt-2 p-3 rounded-lg"></label>
-          <label class="text-xs text-gray-400">MAX MARTINGALE STEPS<input id="maxSteps" type="number" min="0" max="10" value="3" class="w-full mt-2 p-3 rounded-lg"></label>
-        </div>
-        <div class="flex items-center justify-between mt-5 p-4 rounded-xl bg-[#080808] border border-[#242424]">
-          <div><div class="font-black">AUTO TRADE</div><div class="text-xs text-gray-500">OFF by default. Turn on only when you want the engine to execute.</div></div>
-          <button id="autoTrade" onclick="toggleAutoTrade()" class="btn btn-dark">OFF</button>
-        </div>
-        <div class="grid grid-cols-2 gap-3 mt-4">
-          <button id="startAnalysis" onclick="startSniper()" class="btn btn-gold">START ANALYSIS</button>
-          <button id="stopAnalysis" onclick="stopSniper()" class="btn btn-dark" disabled>STOP</button>
-        </div>
-      </div>
-      <div class="panel p-5">
-        <div class="text-xs text-gray-500">SNIPER STATUS</div>
-        <div id="sniperStatus" class="text-2xl font-black mt-2">STOPPED</div>
-        <div class="mt-5 space-y-3 text-sm">
-          <div class="flex justify-between"><span class="text-gray-500">Market</span><b id="sniperMarketLabel">EUR/USD</b></div>
-          <div class="flex justify-between"><span class="text-gray-500">Stake</span><b id="stakeLabel">$1.00</b></div>
-          <div class="flex justify-between"><span class="text-gray-500">Next stake</span><b id="nextStake">$1.00</b></div>
-          <div class="flex justify-between"><span class="text-gray-500">Trades</span><b id="tradeCount">0</b></div>
-        </div>
-      </div>
-    </div>
-    <div class="panel p-5">
-      <h2 class="font-black">TRANSACTION / TRADE LOG</h2>
-      <div id="tradeLog" class="log mt-3 max-h-64 overflow-auto space-y-1"><div class="text-gray-500">No transaction started.</div></div>
-    </div>
-  </section>
+<section id="sniper" class="page space-y-4">
+<div><p class="text-xs text-gray-500">SNIPER ENTRY</p><h1 class="text-3xl font-black">SNIPER ENTRY</h1></div>
+<div class="grid lg:grid-cols-3 gap-4">
+<div class="panel p-5 lg:col-span-2"><div class="grid md:grid-cols-2 gap-4">
+<label class="text-xs text-gray-400">MARKET<select id="sniperMarket" class="w-full mt-2 p-3 rounded-lg" onchange="changeMarket(this.value)"><option value="frxEURUSD">EUR/USD</option><option value="frxGBPUSD">GBP/USD</option><option value="frxUSDJPY">USD/JPY</option><option value="frxAUDUSD">AUD/USD</option><option value="frxUSDCAD">USD/CAD</option><option value="frxUSDCHF">USD/CHF</option><option value="frxXAUUSD">XAU/USD</option></select></label>
+<label class="text-xs text-gray-400">CONTRACT TYPE<select id="contract" class="w-full mt-2 p-3 rounded-lg"><option>CALL</option><option>PUT</option></select></label>
+<label class="text-xs text-gray-400">STAKE<input id="stake" type="number" min=".35" step=".01" value="1" class="w-full mt-2 p-3 rounded-lg"></label>
+<label class="text-xs text-gray-400">MARTINGALE<input id="mult" type="number" min="1" step=".1" value="2" class="w-full mt-2 p-3 rounded-lg"></label>
+<label class="text-xs text-gray-400">DURATION TICKS<input id="duration" type="number" min="1" max="10" value="1" class="w-full mt-2 p-3 rounded-lg"></label>
+<label class="text-xs text-gray-400">MAX MARTINGALE STEPS<input id="maxSteps" type="number" min="0" max="10" value="3" class="w-full mt-2 p-3 rounded-lg"></label>
+</div>
+<div class="flex items-center justify-between panel mt-4 p-4"><div><b>AUTO TRADE</b><div class="text-xs text-gray-500">Execution is OFF until you turn it ON.</div></div><button id="auto" class="btn dark" onclick="toggleAuto()">OFF</button></div>
+<div class="grid grid-cols-2 gap-3 mt-4"><button id="start" class="btn gold" onclick="start()">START ANALYSIS</button><button id="stop" class="btn dark" onclick="stop()" disabled>STOP</button></div>
+</div>
+<div class="panel p-5"><small class="text-gray-500">SNIPER STATUS</small><div id="sniperStatus" class="text-2xl font-black mt-2">STOPPED</div><div class="mt-5 space-y-3 text-sm"><div>Market: <b id="sniperLabel">EUR/USD</b></div><div>Next stake: <b id="nextStake">$1.00</b></div><div>Trades: <b id="trades">0</b></div></div></div>
+</div>
+<div class="panel p-5"><h2 class="font-black">TRANSACTION / TRADE LOG</h2><div id="log" class="log mt-3 max-h-64 overflow-auto"><div class="text-gray-500">No transaction started.</div></div></div>
+</section>
 
-  <section id="analysis" class="page space-y-5">
-    <div><p class="text-xs text-gray-500">ANALYSIS ENGINE</p><h1 class="text-3xl font-black">ANALYSIS ENGINE</h1><p class="text-gray-400 text-sm">Live pipeline. Auto trade is controlled from Sniper Entry.</p></div>
-    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
-      <div class="metric"><span class="text-xs text-gray-500">MARKET</span><div id="engineMarket" class="font-black mt-2">EUR/USD</div></div>
-      <div class="metric"><span class="text-xs text-gray-500">PRICE</span><div id="enginePrice" class="font-black mt-2">--</div></div>
-      <div class="metric"><span class="text-xs text-gray-500">SIGNAL</span><div id="engineSignal" class="font-black mt-2">WAITING</div></div>
-      <div class="metric"><span class="text-xs text-gray-500">ENGINE</span><div id="engineState" class="font-black mt-2">STOPPED</div></div>
-    </div>
-    <div class="panel p-5">
-      <div class="grid md:grid-cols-5 gap-2 text-center text-xs font-bold">
-        <div class="metric">LIVE DERIV TICKS</div><div class="metric">ANALYSIS</div><div class="metric">PREDICTION / SIGNAL</div><div class="metric">RISK CHECK</div><div class="metric">DERIV PROPOSAL → BUY</div>
-      </div>
-    </div>
-  </section>
+<section id="engine" class="page space-y-4">
+<div><p class="text-xs text-gray-500">ANALYSIS ENGINE</p><h1 class="text-3xl font-black">ANALYSIS ENGINE</h1><p class="text-gray-400 text-sm">Auto trade is controlled from Sniper Entry.</p></div>
+<div class="grid md:grid-cols-4 gap-3"><div class="metric">MARKET<div id="engMarket" class="font-black mt-2">EUR/USD</div></div><div class="metric">PRICE<div id="engPrice" class="font-black mt-2">--</div></div><div class="metric">SIGNAL<div id="engSignal" class="font-black mt-2">WAITING</div></div><div class="metric">ENGINE<div id="engState" class="font-black mt-2">STOPPED</div></div></div>
+<div class="panel p-5 grid md:grid-cols-5 gap-2 text-center text-xs font-bold"><div class="metric">LIVE DERIV TICKS</div><div class="metric">ANALYSIS</div><div class="metric">PREDICTION / SIGNAL</div><div class="metric">RISK CHECK</div><div class="metric">DERIV PROPOSAL → BUY</div></div>
+</section>
 
-  <section id="free-bots" class="page space-y-5">
-    <div><p class="text-xs text-gray-500">FREE BOTS</p><h1 class="text-3xl font-black">FREE BOTS</h1></div>
-    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div class="panel p-5"><h2 class="font-black">FOREX TREND HUNTER</h2><p class="text-xs text-gray-500 mt-2">Live directional monitoring.</p><button onclick="startSniper()" class="btn btn-gold w-full mt-4">START</button></div>
-      <div class="panel p-5"><h2 class="font-black">FOREX SNIPER</h2><p class="text-xs text-gray-500 mt-2">Uses the Sniper Entry configuration.</p><button onclick="showPage('sniper')" class="btn btn-dark w-full mt-4">OPEN</button></div>
-    </div>
-  </section>
+<section id="bots" class="page space-y-4"><div><p class="text-xs text-gray-500">FREE BOTS</p><h1 class="text-3xl font-black">FREE BOTS</h1></div><div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"><div class="panel p-5"><h2 class="font-black">FOREX TREND HUNTER</h2><p class="text-xs text-gray-500 mt-2">Live directional monitoring.</p><button class="btn gold w-full mt-4" onclick="page('sniper')">OPEN</button></div><div class="panel p-5"><h2 class="font-black">FOREX SNIPER</h2><p class="text-xs text-gray-500 mt-2">Sniper Entry configuration.</p><button class="btn dark w-full mt-4" onclick="page('sniper')">OPEN</button></div></div></section>
 
-  <section id="calculator" class="page space-y-5">
-    <div><p class="text-xs text-gray-500">CALCULATOR</p><h1 class="text-3xl font-black">MARTINGALE CALCULATOR</h1></div>
-    <div class="panel p-5 max-w-xl">
-      <div class="grid grid-cols-3 gap-3">
-        <label class="text-xs text-gray-400">BASE<input id="calcBase" type="number" value="1" step="0.01" class="w-full mt-2 p-3 rounded-lg" oninput="calc()"></label>
-        <label class="text-xs text-gray-400">MULTIPLIER<input id="calcMult" type="number" value="2" step="0.1" class="w-full mt-2 p-3 rounded-lg" oninput="calc()"></label>
-        <label class="text-xs text-gray-400">STEPS<input id="calcSteps" type="number" value="3" class="w-full mt-2 p-3 rounded-lg" oninput="calc()"></label>
-      </div>
-      <div class="metric mt-4"><span class="text-xs text-gray-500">TOTAL CAPITAL</span><div id="calcTotal" class="text-2xl font-black mt-1">$7.00</div></div>
-    </div>
-  </section>
+<section id="calc" class="page space-y-4"><h1 class="text-3xl font-black">MARTINGALE CALCULATOR</h1><div class="panel p-5 max-w-xl"><div class="grid grid-cols-3 gap-3"><label class="text-xs">BASE<input id="base" type="number" value="1" step=".01" class="w-full mt-2 p-3 rounded-lg" oninput="calculate()"></label><label class="text-xs">MULTIPLIER<input id="cmult" type="number" value="2" step=".1" class="w-full mt-2 p-3 rounded-lg" oninput="calculate()"></label><label class="text-xs">STEPS<input id="steps" type="number" value="3" class="w-full mt-2 p-3 rounded-lg" oninput="calculate()"></label></div><div class="metric mt-4">TOTAL CAPITAL<div id="total" class="text-2xl font-black mt-1">$7.00</div></div></div></section>
 </main>
 
 <script>
-let APP_ID=window.ELISY_DERIV_APP_ID||1089;
-let patToken='';
-
-let ws=null, connected=false, sniperActive=false, autoTrade=false, currentSymbol='frxEURUSD';
-let ticks=[], currentStake=1, lossStep=0, tradeCount=0, lastTradeTime=0;
+let APP_ID=window.ELISY_DERIV_APP_ID||1089,ws=null,connected=false,active=false,auto=false,symbol='frxEURUSD',prices=[],stake=1,losses=0,trades=0,lastTrade=0;
 const names={frxEURUSD:'EUR/USD',frxGBPUSD:'GBP/USD',frxUSDJPY:'USD/JPY',frxAUDUSD:'AUD/USD',frxUSDCAD:'USD/CAD',frxUSDCHF:'USD/CHF',frxXAUUSD:'XAU/USD'};
-
-function showPage(id,btn){
- document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
- document.getElementById(id).classList.add('active');
- if(btn){document.querySelectorAll('.navbtn').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
-}
-function setAccountMode(mode){
- document.getElementById('demoBtn').className='btn '+(mode==='demo'?'btn-gold':'btn-dark');
- document.getElementById('realBtn').className='btn '+(mode==='real'?'btn-gold':'btn-dark');
-}
-function logTrade(m){const box=document.getElementById('tradeLog');if(box.children.length===1&&box.firstElementChild.textContent.includes('No transaction'))box.innerHTML='';const d=document.createElement('div');d.textContent='['+new Date().toLocaleTimeString()+'] '+m;box.prepend(d)}
-function setConnected(v){connected=v;document.getElementById('wsDot').className='status-dot '+(v?'on':'');document.getElementById('wsText').textContent=v?'CONNECTED':'DISCONNECTED';document.getElementById('streamState').textContent=v?'LIVE':'OFFLINE'}
-async function connectPAT(){
- const token=document.getElementById('patToken').value.trim();
- if(!token){alert('Enter your Deriv Personal Access Token (PAT).');return}
- patToken=token;
- try{
-  document.getElementById('wsText').textContent='AUTHENTICATING PAT';
-  const headers={'Authorization':'Bearer '+token,'Deriv-App-ID':String(APP_ID),'Content-Type':'application/json'};
-  const r=await fetch('https://api.derivws.com/trading/v1/options/accounts',{headers});
-  const body=await r.json();
-  if(!r.ok) throw new Error(body?.errors?.[0]?.message||'PAT authentication failed');
-  const accounts=Array.isArray(body.data)?body.data:(body.data?[body.data]:[]);
-  if(!accounts.length) throw new Error('No Options trading account was returned for this PAT.');
-  const wanted=document.getElementById('realBtn').classList.contains('btn-gold')?'real':'demo';
-  const account=accounts.find(a=>a.account_type===wanted)||accounts[0];
-  const otp=await fetch('https://api.derivws.com/trading/v1/options/accounts/'+encodeURIComponent(account.account_id)+'/otp',{method:'POST',headers});
-  const otpBody=await otp.json();
-  if(!otp.ok) throw new Error(otpBody?.errors?.[0]?.message||'Could not create WebSocket session');
-  const wsUrl=otpBody?.data?.websocket_url||otpBody?.data?.ws_url;
-  if(!wsUrl) throw new Error('Deriv did not return a WebSocket URL');
-  if(ws)try{ws.close()}catch(e){}
-  ws=new WebSocket(wsUrl);
-  ws.onopen=()=>{setConnected(true);document.getElementById('dashAccount').textContent=account.account_id||'CONNECTED';document.getElementById('dashBalance').textContent='
- const token=document.getElementById('token').value.trim(); if(!token){alert('Enter your Deriv API token.');return}
- if(ws)try{ws.close()}catch(e){}
- ws=new WebSocket('wss://ws.derivws.com/websockets/v3?app_id='+APP_ID);
- ws.onopen=()=>ws.send(JSON.stringify({authorize:token}));
- ws.onmessage=e=>{
-  const d=JSON.parse(e.data);
-  if(d.error){logTrade('ERROR: '+d.error.message);return}
-  if(d.msg_type==='authorize'){setConnected(true);const a=d.authorize;document.getElementById('dashAccount').textContent=a.loginid||'CONNECTED';document.getElementById('dashBalance').textContent='$'+Number(a.balance||0).toFixed(2);ws.send(JSON.stringify({balance:1,subscribe:1}));subscribeTicks()}
-  if(d.msg_type==='balance'&&d.balance)document.getElementById('dashBalance').textContent='$'+Number(d.balance.balance||0).toFixed(2);
-  if(d.msg_type==='tick'&&d.tick)handleTick(Number(d.tick.quote));
-  if(d.msg_type==='proposal'&&d.proposal)handleProposal(d.proposal);
-  if(d.msg_type==='buy'&&d.buy){tradeCount++;document.getElementById('tradeCount').textContent=tradeCount;logTrade('TRADE OPENED • CONTRACT '+d.buy.contract_id);ws.send(JSON.stringify({proposal_open_contract:1,contract_id:d.buy.contract_id,subscribe:1}))}
-  if(d.msg_type==='proposal_open_contract'&&d.proposal_open_contract)handleContract(d.proposal_open_contract);
- };
- ws.onclose=()=>setConnected(false); ws.onerror=()=>setConnected(false);
-}
-function subscribeTicks(){
- if(!ws||ws.readyState!==1)return;
- ws.send(JSON.stringify({forget_all:'ticks'})); ws.send(JSON.stringify({ticks:currentSymbol,subscribe:1}));
-}
-function changeMarket(s){
- currentSymbol=s; document.getElementById('sniperMarket').value=s;document.getElementById('signalMarket').value=s;
- document.getElementById('sniperMarketLabel').textContent=names[s];document.getElementById('dashMarket').textContent=names[s];document.getElementById('engineMarket').textContent=names[s];
- ticks=[]; if(connected)subscribeTicks();
-}
-function handleTick(price){
- document.getElementById('dashPrice').textContent=price;document.getElementById('signalPrice').textContent=price;document.getElementById('enginePrice').textContent=price;
- ticks.push(price);if(ticks.length>20)ticks.shift();
- if(ticks.length>=5){const up=ticks[ticks.length-1]>ticks[ticks.length-5];const dir=up?'CALL':'PUT';const conf=Math.min(95,55+Math.round(Math.abs(ticks[ticks.length-1]-ticks[0])/(Math.abs(ticks[0])||1)*100000));
- document.getElementById('trend').textContent=up?'BULLISH':'BEARISH';document.getElementById('entry').textContent=dir;document.getElementById('confidence').textContent=conf+'%';document.getElementById('signalDirection').textContent=dir;document.getElementById('engineSignal').textContent=dir;
- if(sniperActive)runSniper(dir,price);
- }
-}
-function toggleAutoTrade(){autoTrade=!autoTrade;const b=document.getElementById('autoTrade');b.textContent=autoTrade?'ON':'OFF';b.className='btn '+(autoTrade?'btn-gold':'btn-dark');}
-function startSniper(){
- if(!connected){alert('Connect the Deriv account first.');return}
- sniperActive=true;currentStake=Math.max(.35,Number(document.getElementById('stake').value)||1);lossStep=0;
- document.getElementById('sniperStatus').textContent='ANALYZING';document.getElementById('engineState').textContent='RUNNING';document.getElementById('startAnalysis').disabled=true;document.getElementById('stopAnalysis').disabled=false;
- logTrade('ANALYSIS STARTED • '+names[currentSymbol]+' • '+document.getElementById('contractType').value+' • $'+currentStake.toFixed(2)+(autoTrade?' • AUTO TRADE ON':' • SIGNAL ONLY'));
-}
-function stopSniper(){sniperActive=false;document.getElementById('sniperStatus').textContent='STOPPED';document.getElementById('engineState').textContent='STOPPED';document.getElementById('startAnalysis').disabled=false;document.getElementById('stopAnalysis').disabled=true;logTrade('ANALYSIS STOPPED')}
-function runSniper(signal,price){
- const chosen=document.getElementById('contractType').value;
- if(signal!==chosen)return;
- document.getElementById('nextStake').textContent='$'+currentStake.toFixed(2);
- if(!autoTrade)return;
- const now=Date.now();if(now-lastTradeTime<8000)return;
- lastTradeTime=now; requestProposal(chosen);
-}
-function requestProposal(type){
- if(!ws||ws.readyState!==1)return;
- const duration=Math.max(1,parseInt(document.getElementById('duration').value)||1);
- logTrade('SIGNAL CONFIRMED • REQUESTING DERIV PROPOSAL • '+type+' • $'+currentStake.toFixed(2));
- ws.send(JSON.stringify({proposal:1,amount:Number(currentStake.toFixed(2)),basis:'stake',contract_type:type,currency:'USD',duration,duration_unit:'t',symbol:currentSymbol}));
-}
-function handleProposal(p){
- if(!autoTrade||!sniperActive||!p.id)return;
- ws.send(JSON.stringify({buy:p.id,price:Number(p.ask_price)}));
-}
-function handleContract(c){
- if(c.is_sold){const profit=Number(c.profit||0);if(profit<0){lossStep++;const mult=Number(document.getElementById('martingale').value)||2;const max=Number(document.getElementById('maxSteps').value)||0;if(lossStep<=max){currentStake*=mult;logTrade('LOSS • MARTINGALE STEP '+lossStep+' • NEXT $'+currentStake.toFixed(2))}else{logTrade('LOSS LIMIT REACHED • ANALYSIS STOPPED');stopSniper()}}else{lossStep=0;currentStake=Math.max(.35,Number(document.getElementById('stake').value)||1);logTrade('WIN • STAKE RESET TO $'+currentStake.toFixed(2))}document.getElementById('nextStake').textContent='$'+currentStake.toFixed(2)}}
-function calc(){const b=Number(document.getElementById('calcBase').value)||0,m=Number(document.getElementById('calcMult').value)||0,s=Math.max(0,Number(document.getElementById('calcSteps').value)||0);let t=0,x=b;for(let i=0;i<s;i++){t+=x;x*=m}document.getElementById('calcTotal').textContent='$'+t.toFixed(2)}
-document.getElementById('stake').addEventListener('input',e=>{document.getElementById('stakeLabel').textContent='$'+Number(e.target.value||0).toFixed(2)});
-async function loadConfig(){
- try{
-  const r=await fetch('/api/config',{cache:'no-store'});
-  if(r.ok){const x=await r.json();if(x.derivAppId)APP_ID=String(x.derivAppId)}
- }catch(e){console.warn('Vercel config unavailable; using fallback App ID')}
-}
-loadConfig();
-calc();setAccountMode('demo');
+const $=id=>document.getElementById(id);
+function page(id,btn){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));$(id).classList.add('active');if(btn){document.querySelectorAll('.navbtn').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}}
+function mode(m){$('demo').className='btn '+(m==='demo'?'gold':'dark');$('real').className='btn '+(m==='real'?'gold':'dark')}
+function setConnected(v){connected=v;$('dot').className='dot '+(v?'on':'');$('status').textContent=v?'CONNECTED':'DISCONNECTED';$('stream').textContent=v?'LIVE':'OFFLINE'}
+function log(m){if($('log').children.length===1&&$('log').firstElementChild.textContent.includes('No transaction'))$('log').innerHTML='';let d=document.createElement('div');d.textContent='['+new Date().toLocaleTimeString()+'] '+m;$('log').prepend(d)}
+function subscribe(){if(ws&&ws.readyState===1){ws.send(JSON.stringify({forget_all:'ticks'}));ws.send(JSON.stringify({ticks:symbol,subscribe:1}))}}
+function handleTick(p){$('price').textContent=p;$('signalPrice').textContent=p;$('engPrice').textContent=p;prices.push(p);if(prices.length>20)prices.shift();if(prices.length>=5){let up=prices.at(-1)>prices.at(-5),dir=up?'CALL':'PUT',c=Math.min(95,55+Math.round(Math.abs(prices.at(-1)-prices[0])/(Math.abs(prices[0])||1)*100000));$('trend').textContent=up?'BULLISH':'BEARISH';$('entry').textContent=dir;$('confidence').textContent=c+'%';$('direction').textContent=dir;$('engSignal').textContent=dir;if(active&&auto&&dir===$('contract').value&&Date.now()-lastTrade>8000){lastTrade=Date.now();proposal(dir)}}}
+function changeMarket(s){symbol=s;prices=[];$('signalMarket').value=s;$('sniperMarket').value=s;$('marketText').textContent=names[s];$('sniperLabel').textContent=names[s];$('engMarket').textContent=names[s];if(connected)subscribe()}
+function toggleAuto(){auto=!auto;$('auto').textContent=auto?'ON':'OFF';$('auto').className='btn '+(auto?'gold':'dark')}
+function start(){if(!connected){alert('Connect your Deriv account first.');return}active=true;stake=Math.max(.35,Number($('stake').value)||1);losses=0;$('sniperStatus').textContent='ANALYZING';$('engState').textContent='RUNNING';$('start').disabled=true;$('stop').disabled=false;log('ANALYSIS STARTED • '+names[symbol]+' • '+$('contract').value+' • $'+stake.toFixed(2))}
+function stop(){active=false;$('sniperStatus').textContent='STOPPED';$('engState').textContent='STOPPED';$('start').disabled=false;$('stop').disabled=true;log('ANALYSIS STOPPED')}
+function proposal(type){if(!ws||ws.readyState!==1)return;let duration=Math.max(1,parseInt($('duration').value)||1);log('SIGNAL CONFIRMED • REQUESTING PROPOSAL • '+type+' • $'+stake.toFixed(2));ws.send(JSON.stringify({proposal:1,amount:Number(stake.toFixed(2)),basis:'stake',contract_type:type,currency:'USD',duration,duration_unit:'t',symbol}))}
+function onMessage(d){if(d.error){log('ERROR: '+d.error.message);return}if(d.msg_type==='authorize'){setConnected(true);$('account').textContent=d.authorize.loginid||'CONNECTED';$('balance').textContent='$'+Number(d.authorize.balance||0).toFixed(2);subscribe()}if(d.msg_type==='balance')$('balance').textContent='$'+Number(d.balance.balance||0).toFixed(2);if(d.msg_type==='tick')handleTick(Number(d.tick.quote));if(d.msg_type==='proposal'&&d.proposal&&auto&&active)ws.send(JSON.stringify({buy:d.proposal.id,price:Number(d.proposal.ask_price)}));if(d.msg_type==='buy'){trades++;$('trades').textContent=trades;log('TRADE OPENED • CONTRACT '+d.buy.contract_id);ws.send(JSON.stringify({proposal_open_contract:1,contract_id:d.buy.contract_id,subscribe:1}))}if(d.msg_type==='proposal_open_contract'&&d.proposal_open_contract?.is_sold){let profit=Number(d.proposal_open_contract.profit||0);if(profit<0){losses++;let max=Number($('maxSteps').value)||0;if(losses<=max){stake*=Number($('mult').value)||2;log('LOSS • MARTINGALE STEP '+losses+' • NEXT $'+stake.toFixed(2))}else{log('LOSS LIMIT REACHED');stop()}}else{losses=0;stake=Math.max(.35,Number($('stake').value)||1);log('WIN • STAKE RESET')}$('nextStake').textContent='$'+stake.toFixed(2)}}
+function connectLegacy(){let t=$('token').value.trim();if(!t){alert('Enter your Deriv API token.');return}if(ws)try{ws.close()}catch(e){}ws=new WebSocket('wss://ws.derivws.com/websockets/v3?app_id='+APP_ID);ws.onopen=()=>ws.send(JSON.stringify({authorize:t}));ws.onmessage=e=>onMessage(JSON.parse(e.data));ws.onclose=()=>setConnected(false);ws.onerror=()=>setConnected(false)}
+async function loginPAT(){let t=$('pat').value.trim();if(!t){alert('Enter your Personal Access Token (PAT).');return}try{ $('status').textContent='AUTHENTICATING PAT';let h={'Authorization':'Bearer '+t,'Deriv-App-ID':String(APP_ID),'Content-Type':'application/json'};let r=await fetch('https://api.derivws.com/trading/v1/options/accounts',{headers:h}),b=await r.json();if(!r.ok)throw Error(b?.errors?.[0]?.message||'PAT authentication failed');let a=Array.isArray(b.data)?b.data:(b.data?[b.data]:[]);if(!a.length)throw Error('No trading account returned');let wanted=$('real').classList.contains('gold')?'real':'demo',acc=a.find(x=>x.account_type===wanted)||a[0];r=await fetch('https://api.derivws.com/trading/v1/options/accounts/'+encodeURIComponent(acc.account_id)+'/otp',{method:'POST',headers:h});b=await r.json();if(!r.ok)throw Error(b?.errors?.[0]?.message||'Could not create session');let url=b?.data?.websocket_url||b?.data?.ws_url;if(!url)throw Error('No WebSocket URL returned');if(ws)try{ws.close()}catch(e){}ws=new WebSocket(url);ws.onopen=()=>{setConnected(true);$('account').textContent=acc.account_id||'CONNECTED';$('balance').textContent='$'+Number(acc.balance||0).toFixed(2);subscribe();log('PAT LOGIN SUCCESS • '+(acc.account_id||''))};ws.onmessage=e=>onMessage(JSON.parse(e.data));ws.onclose=()=>setConnected(false);ws.onerror=()=>setConnected(false)}catch(e){setConnected(false);alert('PAT login failed: '+e.message);log('PAT ERROR: '+e.message)}}
+function calculate(){let b=Number($('base').value)||0,m=Number($('cmult').value)||0,n=Math.max(0,Number($('steps').value)||0),t=0,x=b;for(let i=0;i<n;i++){t+=x;x*=m}$('total').textContent='$'+t.toFixed(2)}
+async function loadConfig(){try{let r=await fetch('/api/config',{cache:'no-store'});if(r.ok){let x=await r.json();if(x.derivAppId)APP_ID=String(x.derivAppId)}}catch(e){}}
+loadConfig();calculate();mode('demo');
 </script>
-</body>
-</html>+Number(account.balance||0).toFixed(2);subscribeTicks();logTrade('PAT LOGIN SUCCESS • '+account.account_id+' • '+account.account_type.toUpperCase())};
-  ws.onmessage=e=>handlePATMessage(JSON.parse(e.data));
-  ws.onclose=()=>setConnected(false);
-  ws.onerror=()=>{setConnected(false);logTrade('PAT WebSocket connection error')};
- }catch(err){setConnected(false);alert('PAT login failed: '+err.message);logTrade('PAT ERROR: '+err.message)}
-}
-function handlePATMessage(d){
- if(d.error){logTrade('ERROR: '+d.error.message);return}
- if(d.msg_type==='tick'&&d.tick)handleTick(Number(d.tick.quote));
- if(d.msg_type==='proposal'&&d.proposal)handleProposal(d.proposal);
- if(d.msg_type==='buy'&&d.buy){tradeCount++;document.getElementById('tradeCount').textContent=tradeCount;logTrade('TRADE OPENED • CONTRACT '+d.buy.contract_id);ws.send(JSON.stringify({proposal_open_contract:1,contract_id:d.buy.contract_id,subscribe:1}))}
- if(d.msg_type==='proposal_open_contract'&&d.proposal_open_contract)handleContract(d.proposal_open_contract);
- if(d.msg_type==='balance'&&d.balance)document.getElementById('dashBalance').textContent='
- const token=document.getElementById('token').value.trim(); if(!token){alert('Enter your Deriv API token.');return}
- if(ws)try{ws.close()}catch(e){}
- ws=new WebSocket('wss://ws.derivws.com/websockets/v3?app_id='+APP_ID);
- ws.onopen=()=>ws.send(JSON.stringify({authorize:token}));
- ws.onmessage=e=>{
-  const d=JSON.parse(e.data);
-  if(d.error){logTrade('ERROR: '+d.error.message);return}
-  if(d.msg_type==='authorize'){setConnected(true);const a=d.authorize;document.getElementById('dashAccount').textContent=a.loginid||'CONNECTED';document.getElementById('dashBalance').textContent='$'+Number(a.balance||0).toFixed(2);ws.send(JSON.stringify({balance:1,subscribe:1}));subscribeTicks()}
-  if(d.msg_type==='balance'&&d.balance)document.getElementById('dashBalance').textContent='$'+Number(d.balance.balance||0).toFixed(2);
-  if(d.msg_type==='tick'&&d.tick)handleTick(Number(d.tick.quote));
-  if(d.msg_type==='proposal'&&d.proposal)handleProposal(d.proposal);
-  if(d.msg_type==='buy'&&d.buy){tradeCount++;document.getElementById('tradeCount').textContent=tradeCount;logTrade('TRADE OPENED • CONTRACT '+d.buy.contract_id);ws.send(JSON.stringify({proposal_open_contract:1,contract_id:d.buy.contract_id,subscribe:1}))}
-  if(d.msg_type==='proposal_open_contract'&&d.proposal_open_contract)handleContract(d.proposal_open_contract);
- };
- ws.onclose=()=>setConnected(false); ws.onerror=()=>setConnected(false);
-}
-function subscribeTicks(){
- if(!ws||ws.readyState!==1)return;
- ws.send(JSON.stringify({forget_all:'ticks'})); ws.send(JSON.stringify({ticks:currentSymbol,subscribe:1}));
-}
-function changeMarket(s){
- currentSymbol=s; document.getElementById('sniperMarket').value=s;document.getElementById('signalMarket').value=s;
- document.getElementById('sniperMarketLabel').textContent=names[s];document.getElementById('dashMarket').textContent=names[s];document.getElementById('engineMarket').textContent=names[s];
- ticks=[]; if(connected)subscribeTicks();
-}
-function handleTick(price){
- document.getElementById('dashPrice').textContent=price;document.getElementById('signalPrice').textContent=price;document.getElementById('enginePrice').textContent=price;
- ticks.push(price);if(ticks.length>20)ticks.shift();
- if(ticks.length>=5){const up=ticks[ticks.length-1]>ticks[ticks.length-5];const dir=up?'CALL':'PUT';const conf=Math.min(95,55+Math.round(Math.abs(ticks[ticks.length-1]-ticks[0])/(Math.abs(ticks[0])||1)*100000));
- document.getElementById('trend').textContent=up?'BULLISH':'BEARISH';document.getElementById('entry').textContent=dir;document.getElementById('confidence').textContent=conf+'%';document.getElementById('signalDirection').textContent=dir;document.getElementById('engineSignal').textContent=dir;
- if(sniperActive)runSniper(dir,price);
- }
-}
-function toggleAutoTrade(){autoTrade=!autoTrade;const b=document.getElementById('autoTrade');b.textContent=autoTrade?'ON':'OFF';b.className='btn '+(autoTrade?'btn-gold':'btn-dark');}
-function startSniper(){
- if(!connected){alert('Connect the Deriv account first.');return}
- sniperActive=true;currentStake=Math.max(.35,Number(document.getElementById('stake').value)||1);lossStep=0;
- document.getElementById('sniperStatus').textContent='ANALYZING';document.getElementById('engineState').textContent='RUNNING';document.getElementById('startAnalysis').disabled=true;document.getElementById('stopAnalysis').disabled=false;
- logTrade('ANALYSIS STARTED • '+names[currentSymbol]+' • '+document.getElementById('contractType').value+' • $'+currentStake.toFixed(2)+(autoTrade?' • AUTO TRADE ON':' • SIGNAL ONLY'));
-}
-function stopSniper(){sniperActive=false;document.getElementById('sniperStatus').textContent='STOPPED';document.getElementById('engineState').textContent='STOPPED';document.getElementById('startAnalysis').disabled=false;document.getElementById('stopAnalysis').disabled=true;logTrade('ANALYSIS STOPPED')}
-function runSniper(signal,price){
- const chosen=document.getElementById('contractType').value;
- if(signal!==chosen)return;
- document.getElementById('nextStake').textContent='$'+currentStake.toFixed(2);
- if(!autoTrade)return;
- const now=Date.now();if(now-lastTradeTime<8000)return;
- lastTradeTime=now; requestProposal(chosen);
-}
-function requestProposal(type){
- if(!ws||ws.readyState!==1)return;
- const duration=Math.max(1,parseInt(document.getElementById('duration').value)||1);
- logTrade('SIGNAL CONFIRMED • REQUESTING DERIV PROPOSAL • '+type+' • $'+currentStake.toFixed(2));
- ws.send(JSON.stringify({proposal:1,amount:Number(currentStake.toFixed(2)),basis:'stake',contract_type:type,currency:'USD',duration,duration_unit:'t',symbol:currentSymbol}));
-}
-function handleProposal(p){
- if(!autoTrade||!sniperActive||!p.id)return;
- ws.send(JSON.stringify({buy:p.id,price:Number(p.ask_price)}));
-}
-function handleContract(c){
- if(c.is_sold){const profit=Number(c.profit||0);if(profit<0){lossStep++;const mult=Number(document.getElementById('martingale').value)||2;const max=Number(document.getElementById('maxSteps').value)||0;if(lossStep<=max){currentStake*=mult;logTrade('LOSS • MARTINGALE STEP '+lossStep+' • NEXT $'+currentStake.toFixed(2))}else{logTrade('LOSS LIMIT REACHED • ANALYSIS STOPPED');stopSniper()}}else{lossStep=0;currentStake=Math.max(.35,Number(document.getElementById('stake').value)||1);logTrade('WIN • STAKE RESET TO $'+currentStake.toFixed(2))}document.getElementById('nextStake').textContent='$'+currentStake.toFixed(2)}}
-function calc(){const b=Number(document.getElementById('calcBase').value)||0,m=Number(document.getElementById('calcMult').value)||0,s=Math.max(0,Number(document.getElementById('calcSteps').value)||0);let t=0,x=b;for(let i=0;i<s;i++){t+=x;x*=m}document.getElementById('calcTotal').textContent='$'+t.toFixed(2)}
-document.getElementById('stake').addEventListener('input',e=>{document.getElementById('stakeLabel').textContent='$'+Number(e.target.value||0).toFixed(2)});
-calc();setAccountMode('demo');
-</script>
-</body>
-</html>+Number(d.balance.balance||0).toFixed(2);
-}
-function connect(){
- const token=document.getElementById('token').value.trim(); if(!token){alert('Enter your Deriv API token.');return}
- if(ws)try{ws.close()}catch(e){}
- ws=new WebSocket('wss://ws.derivws.com/websockets/v3?app_id='+APP_ID);
- ws.onopen=()=>ws.send(JSON.stringify({authorize:token}));
- ws.onmessage=e=>{
-  const d=JSON.parse(e.data);
-  if(d.error){logTrade('ERROR: '+d.error.message);return}
-  if(d.msg_type==='authorize'){setConnected(true);const a=d.authorize;document.getElementById('dashAccount').textContent=a.loginid||'CONNECTED';document.getElementById('dashBalance').textContent='$'+Number(a.balance||0).toFixed(2);ws.send(JSON.stringify({balance:1,subscribe:1}));subscribeTicks()}
-  if(d.msg_type==='balance'&&d.balance)document.getElementById('dashBalance').textContent='$'+Number(d.balance.balance||0).toFixed(2);
-  if(d.msg_type==='tick'&&d.tick)handleTick(Number(d.tick.quote));
-  if(d.msg_type==='proposal'&&d.proposal)handleProposal(d.proposal);
-  if(d.msg_type==='buy'&&d.buy){tradeCount++;document.getElementById('tradeCount').textContent=tradeCount;logTrade('TRADE OPENED • CONTRACT '+d.buy.contract_id);ws.send(JSON.stringify({proposal_open_contract:1,contract_id:d.buy.contract_id,subscribe:1}))}
-  if(d.msg_type==='proposal_open_contract'&&d.proposal_open_contract)handleContract(d.proposal_open_contract);
- };
- ws.onclose=()=>setConnected(false); ws.onerror=()=>setConnected(false);
-}
-function subscribeTicks(){
- if(!ws||ws.readyState!==1)return;
- ws.send(JSON.stringify({forget_all:'ticks'})); ws.send(JSON.stringify({ticks:currentSymbol,subscribe:1}));
-}
-function changeMarket(s){
- currentSymbol=s; document.getElementById('sniperMarket').value=s;document.getElementById('signalMarket').value=s;
- document.getElementById('sniperMarketLabel').textContent=names[s];document.getElementById('dashMarket').textContent=names[s];document.getElementById('engineMarket').textContent=names[s];
- ticks=[]; if(connected)subscribeTicks();
-}
-function handleTick(price){
- document.getElementById('dashPrice').textContent=price;document.getElementById('signalPrice').textContent=price;document.getElementById('enginePrice').textContent=price;
- ticks.push(price);if(ticks.length>20)ticks.shift();
- if(ticks.length>=5){const up=ticks[ticks.length-1]>ticks[ticks.length-5];const dir=up?'CALL':'PUT';const conf=Math.min(95,55+Math.round(Math.abs(ticks[ticks.length-1]-ticks[0])/(Math.abs(ticks[0])||1)*100000));
- document.getElementById('trend').textContent=up?'BULLISH':'BEARISH';document.getElementById('entry').textContent=dir;document.getElementById('confidence').textContent=conf+'%';document.getElementById('signalDirection').textContent=dir;document.getElementById('engineSignal').textContent=dir;
- if(sniperActive)runSniper(dir,price);
- }
-}
-function toggleAutoTrade(){autoTrade=!autoTrade;const b=document.getElementById('autoTrade');b.textContent=autoTrade?'ON':'OFF';b.className='btn '+(autoTrade?'btn-gold':'btn-dark');}
-function startSniper(){
- if(!connected){alert('Connect the Deriv account first.');return}
- sniperActive=true;currentStake=Math.max(.35,Number(document.getElementById('stake').value)||1);lossStep=0;
- document.getElementById('sniperStatus').textContent='ANALYZING';document.getElementById('engineState').textContent='RUNNING';document.getElementById('startAnalysis').disabled=true;document.getElementById('stopAnalysis').disabled=false;
- logTrade('ANALYSIS STARTED • '+names[currentSymbol]+' • '+document.getElementById('contractType').value+' • $'+currentStake.toFixed(2)+(autoTrade?' • AUTO TRADE ON':' • SIGNAL ONLY'));
-}
-function stopSniper(){sniperActive=false;document.getElementById('sniperStatus').textContent='STOPPED';document.getElementById('engineState').textContent='STOPPED';document.getElementById('startAnalysis').disabled=false;document.getElementById('stopAnalysis').disabled=true;logTrade('ANALYSIS STOPPED')}
-function runSniper(signal,price){
- const chosen=document.getElementById('contractType').value;
- if(signal!==chosen)return;
- document.getElementById('nextStake').textContent='$'+currentStake.toFixed(2);
- if(!autoTrade)return;
- const now=Date.now();if(now-lastTradeTime<8000)return;
- lastTradeTime=now; requestProposal(chosen);
-}
-function requestProposal(type){
- if(!ws||ws.readyState!==1)return;
- const duration=Math.max(1,parseInt(document.getElementById('duration').value)||1);
- logTrade('SIGNAL CONFIRMED • REQUESTING DERIV PROPOSAL • '+type+' • $'+currentStake.toFixed(2));
- ws.send(JSON.stringify({proposal:1,amount:Number(currentStake.toFixed(2)),basis:'stake',contract_type:type,currency:'USD',duration,duration_unit:'t',symbol:currentSymbol}));
-}
-function handleProposal(p){
- if(!autoTrade||!sniperActive||!p.id)return;
- ws.send(JSON.stringify({buy:p.id,price:Number(p.ask_price)}));
-}
-function handleContract(c){
- if(c.is_sold){const profit=Number(c.profit||0);if(profit<0){lossStep++;const mult=Number(document.getElementById('martingale').value)||2;const max=Number(document.getElementById('maxSteps').value)||0;if(lossStep<=max){currentStake*=mult;logTrade('LOSS • MARTINGALE STEP '+lossStep+' • NEXT $'+currentStake.toFixed(2))}else{logTrade('LOSS LIMIT REACHED • ANALYSIS STOPPED');stopSniper()}}else{lossStep=0;currentStake=Math.max(.35,Number(document.getElementById('stake').value)||1);logTrade('WIN • STAKE RESET TO $'+currentStake.toFixed(2))}document.getElementById('nextStake').textContent='$'+currentStake.toFixed(2)}}
-function calc(){const b=Number(document.getElementById('calcBase').value)||0,m=Number(document.getElementById('calcMult').value)||0,s=Math.max(0,Number(document.getElementById('calcSteps').value)||0);let t=0,x=b;for(let i=0;i<s;i++){t+=x;x*=m}document.getElementById('calcTotal').textContent='$'+t.toFixed(2)}
-document.getElementById('stake').addEventListener('input',e=>{document.getElementById('stakeLabel').textContent='$'+Number(e.target.value||0).toFixed(2)});
-calc();setAccountMode('demo');
-</script>
-</body>
-</html>
+</body></html>
