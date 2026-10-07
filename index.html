@@ -108,7 +108,8 @@ async function oauthStart(signup=false){
   try{
     if(!APP_ID)throw Error('Deriv OAuth App ID is not configured. Add DERIV_APP_ID in Vercel.');
     const bytes=crypto.getRandomValues(new Uint8Array(64));
-    const verifier=Array.from(bytes).map(v=>'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~'[v%66]).join('');
+    const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    const verifier=Array.from(bytes).map(v=>alphabet[v%alphabet.length]).join('');
     const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));
     const challenge=btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
     const state=Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -140,66 +141,50 @@ async function handleOAuthCallback(){
     const r=await fetch('/api/oauth/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,code_verifier:verifier,redirect_uri:redirect,client_id:APP_ID})});
     const b=await r.json();
     if(!r.ok||!b.access_token)throw Error(b?.error_description||b?.error||'OAuth token exchange failed');
-    sessionStorage.removeItem('oauth_state');sessionStorage.removeItem('oauth_code_verifier');
+    sessionStorage.removeItem('oauth_state');
+    sessionStorage.removeItem('oauth_code_verifier');
     sessionStorage.setItem('oauth_access_token',b.access_token);
-    if(sessionStorage.getItem('oauth_mode'))mode=sessionStorage.getItem('oauth_mode');
+    const savedMode=sessionStorage.getItem('oauth_mode');
+    if(savedMode)mode=savedMode;
     history.replaceState({},'',window.location.pathname);
-    await connectOAuth(b.access_token);
-  }catch(e){alert('Sign-in failed: '+e.message);log('OAUTH ERROR • '+e.message)}
+    await connectWithToken(b.access_token,'DERIV SIGN-IN');
+  }catch(e){sessionStorage.removeItem('oauth_access_token');alert('Sign-in failed: '+e.message);log('OAUTH ERROR • '+e.message)}
 }
-async function connectOAuth(token){
+async function connectWithToken(token,authLabel){
   try{
-    const h={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
-    const r=await fetch('/api/deriv/accounts',{headers:h});
+    setConnected(false);
+    $('status').textContent='CONNECTING';
+    if(!token)throw Error('No Deriv access token was supplied.');
+    if(!APP_ID)throw Error('Deriv App ID is not configured on Vercel. Add DERIV_APP_ID and redeploy.');
+    const headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
+    const r=await fetch('/api/deriv/accounts',{headers});
     const b=await r.json();
-    if(!r.ok)throw Error(b?.errors?.[0]?.message||b?.error||'Could not load Deriv account');
+    if(!r.ok)throw Error(b?.errors?.[0]?.message||b?.error||'Authentication failed');
     const accounts=Array.isArray(b.data)?b.data:(b.data?[b.data]:[]);
     if(!accounts.length)throw Error('No Deriv trading account found');
-    const wanted=accounts.find(a=>String(a.account_type||'').toLowerCase()===mode)||accounts[0];
-    const ar=await fetch('/api/deriv/otp',{method:'POST',headers:h,body:JSON.stringify({account_id:wanted.account_id})});
+    const wanted=accounts.find(a=>String(a.account_type||'').toLowerCase()===String(mode).toLowerCase())||accounts[0];
+    const ar=await fetch('/api/deriv/otp',{method:'POST',headers,body:JSON.stringify({account_id:wanted.account_id})});
     const ab=await ar.json();
     if(!ar.ok)throw Error(ab?.errors?.[0]?.message||ab?.error||'Could not create WebSocket session');
     const url=ab?.data?.url||ab?.data?.websocket_url||ab?.data?.ws_url;
     if(!url)throw Error('Deriv did not return a WebSocket URL');
     if(ws)try{ws.close()}catch(e){}
     ws=new WebSocket(url);
-    ws.onopen=()=>{setConnected(true);$('account').textContent=wanted.account_id||'CONNECTED';$('balance').textContent='$'+Number(wanted.balance||0).toFixed(2);log('DERIV SIGN-IN CONNECTED • '+wanted.account_id);subscribe()};
+    ws.onopen=()=>{
+      setConnected(true);
+      $('account').textContent=wanted.account_id||'CONNECTED';
+      $('balance').textContent='$'+Number(wanted.balance||0).toFixed(2);
+      log(authLabel+' CONNECTED • '+(wanted.account_id||'ACCOUNT'));
+      subscribe();
+    };
     ws.onmessage=e=>{try{onMessage(JSON.parse(e.data))}catch(err){log('MESSAGE ERROR')}};
     ws.onerror=()=>{setConnected(false);log('WEBSOCKET ERROR')};
     ws.onclose=()=>setConnected(false);
   }catch(e){
     setConnected(false);
     $('status').textContent='DISCONNECTED';
-    sessionStorage.removeItem('oauth_access_token');
+    if(authLabel==='DERIV SIGN-IN')sessionStorage.removeItem('oauth_access_token');
     alert('Deriv connection failed: '+e.message);
-    log('OAUTH ERROR • '+e.message);
-  }
-}
-async function connectWithToken(token,authLabel){
-  try{
-    setConnected(false);$('status').textContent='CONNECTING';
-    if(!APP_ID)throw Error('Deriv App ID is not configured on Vercel. Add DERIV_APP_ID and redeploy.');
-    const h={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
-    const r=await fetch('/api/deriv/accounts',{headers:h});
-    const b=await r.json();
-    if(!r.ok)throw Error(b?.errors?.[0]?.message||b?.error||'Authentication failed');
-    const accounts=Array.isArray(b.data)?b.data:(b.data?[b.data]:[]);
-    if(!accounts.length)throw Error('No Deriv trading account found');
-    const wanted=accounts.find(a=>String(a.account_type||'').toLowerCase()===mode)||accounts[0];
-    const ar=await fetch('/api/deriv/otp',{method:'POST',headers:h,body:JSON.stringify({account_id:wanted.account_id})});
-    const ab=await ar.json();
-    if(!ar.ok)throw Error(ab?.errors?.[0]?.message||ab?.error||'Could not create WebSocket session');
-    const url=ab?.data?.url||ab?.data?.websocket_url||ab?.data?.ws_url;
-    if(!url)throw Error('Deriv did not return a WebSocket URL');
-    if(ws)try{ws.close()}catch(e){}
-    ws=new WebSocket(url);
-    ws.onopen=()=>{setConnected(true);$('account').textContent=wanted.account_id||'CONNECTED';$('balance').textContent='$'+Number(wanted.balance||0).toFixed(2);log(authLabel+' CONNECTED • '+wanted.account_id);subscribe()};
-    ws.onmessage=e=>{try{onMessage(JSON.parse(e.data))}catch(err){log('MESSAGE ERROR')}};
-    ws.onerror=()=>{setConnected(false);log('WEBSOCKET ERROR')};
-    ws.onclose=()=>setConnected(false);
-  }catch(e){
-    setConnected(false);$('status').textContent='DISCONNECTED';
-    alert(authLabel+' connection failed: '+e.message);
     log(authLabel+' ERROR • '+e.message);
   }
 }
@@ -211,9 +196,26 @@ async function connectPAT(){
   }
   await connectWithToken(token,'PAT');
 }
-function calculate(){let b=Number($('base').value)||0,m=Number($('cmult').value)||0,n=Math.max(0,Number($('steps').value)||0),t=0,x=b;for(let i=0;i<n;i++){t+=x;x*=m}$('total').textContent='$'+t.toFixed(2)}
-async function loadConfig(){try{let r=await fetch('/api/config',{cache:'no-store'});if(!r.ok)throw Error('Config endpoint unavailable');let x=await r.json();if(x.derivAppId)APP_ID=String(x.derivAppId)}catch(e){APP_ID='';log('CONFIG ERROR • Add DERIV_APP_ID in Vercel')}}
-loadConfig().then(()=>handleOAuthCallback());calculate();setMode('demo');
+function calculate(){
+  let b=Number($('base').value)||0,m=Number($('cmult').value)||0,n=Math.max(0,Number($('steps').value)||0),t=0,x=b;
+  for(let i=0;i<n;i++){t+=x;x*=m}
+  $('total').textContent='$'+t.toFixed(2);
+}
+async function loadConfig(){
+  try{
+    const r=await fetch('/api/config',{cache:'no-store'});
+    if(!r.ok)throw Error('Config endpoint unavailable');
+    const x=await r.json();
+    if(x.derivAppId)APP_ID=String(x.derivAppId);
+    else log('CONFIG ERROR • Add DERIV_APP_ID in Vercel');
+  }catch(e){
+    APP_ID='';
+    log('CONFIG ERROR • Add DERIV_APP_ID in Vercel');
+  }
+}
+loadConfig().then(()=>handleOAuthCallback());
+calculate();
+setMode('demo');
 </script>
 </body>
 </html>
